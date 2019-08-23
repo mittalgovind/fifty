@@ -1,0 +1,7 @@
+heic
+gif
+jpg
+mov
+txt
+csv
+
