@@ -67,6 +67,14 @@ def get_model(args):
                 raise FileNotFoundError('Could not find the specified model!')
         except RuntimeError:
             raise RuntimeError('Could not load the specified model!')
+    elif args.new_model is not None:
+        try:
+            if os.path.isfile(os.path.abspath(args.new_model)):
+                model = load_model(args.new_model)
+            else:
+                raise FileNotFoundError('Could not find the specified model!')
+        except RuntimeError:
+            raise RuntimeError('Could not load the specified model!')
     else:
         if args.block_size not in [512, 4096]:
             raise ValueError('Invalid block size!')
@@ -127,5 +135,5 @@ def output_predictions(args, pred_probability):
     else:
         df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
     out_file.close()
-    print("Written to {}.".format(args.output))
+    print("Written to {}/output.csv.".format(args.output))
     return

@@ -166,7 +166,7 @@ def train(args):
         verbose = 0
     elif args.vv:
         verbose = 1
-    elif args.vvv :
+    elif args.vvv:
         verbose = 2
     parameter_space = {
         'layers': hp.choice('layers', [1, 2, 3]),
@@ -180,19 +180,23 @@ def train(args):
     trials = Trials()
 
     if args.algo.lower() == 'tpe':
-        hyper_algo = tpe.suggest
+        algo = partial(
+            tpe.suggest,
+            n_EI_candidates=1000,
+            gamma=0.2,
+            n_startup_jobs=int(0.1 * args.max_evals),
+        )
+
     elif args.algo.lower() == 'rand':
-        hyper_algo = rand.suggest
+        algo = rand.suggest
     else:
         print('ERROR! The requested hyper-parameter algorithm is not supported. Using TPE.')
-        hyper_algo = tpe.suggest
-
-    algo = partial(
-        hyper_algo,
-        n_EI_candidates=1000,
-        gamma=0.2,
-        n_startup_jobs=int(0.1 * args.max_evals),
-    )
+        algo = partial(
+            tpe.suggest,
+            n_EI_candidates=1000,
+            gamma=0.2,
+            n_startup_jobs=int(0.1 * args.max_evals),
+        )
 
     fmin(
         train_network,
@@ -205,8 +209,8 @@ def train(args):
     df.to_csv(os.path.join(args.output, 'parameters.csv'))
     best = get_best()
     print('\n-------------------------------------\n')
-    print('Hyper-parameter space exploration ended. \nTraining the best again.')
-    # retrain the best again on the full dataset
+    print('Hyper-parameter space exploration ended. \nRetraining the best again on the full dataset.')
+    #
     percent = 1
     train_network(best)
     print('The best model has been retrained and saved as {}.'.format(args.new_model))
