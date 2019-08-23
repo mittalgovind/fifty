@@ -1,9 +1,9 @@
+#!/usr/bin/python3
+import os
+import sys
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import argparse
-import tensorflow as tf
-from framework import *
-from train_model import train
-
-tf.logging.set_verbosity(tf.logging.ERROR)
+from framework import make_output_folder, get_model, read_disk, infer, output_predictions
 
 parser = argparse.ArgumentParser(description='FiFTy: File-Fragment Type Classifier using Neural Networks')
 classifier_group = parser.add_argument_group('Classification Options')
@@ -26,8 +26,8 @@ classifier_group.add_argument('-m', '--model-name', type=str, default=None,
                               help='Path to an explicit model to use for inference.')
 
 train_group.add_argument('-t', '--train', action='store_true', help='Train a new model')
-train_group.add_argument('-nm', '--new-model', type=str, default='new_model',
-                         help='Name of the new model to train. (default: new_model)')
+train_group.add_argument('-nm', '--new-model', type=str, default=None,
+                         help='Name of the new model to train.')
 train_group.add_argument('-d', '--data-dir', type=str, default='./data',
                          help='Path to the FFT-75 data. Please extract to ./data before continuing. (default: ./data)')
 train_group.add_argument('-a', '--algo', type=str, default='tpe',
@@ -44,13 +44,18 @@ train_group.add_argument('-su', '--scale-up', action='store_true',
                          help='Train with newer filetypes. Please refer documentation.')
 
 args = parser.parse_args()
+
+if args.disk_name is None:
+    parser.print_usage()
+    sys.exit(1)
+
 make_output_folder(args)
 
 if args.train:
+    from train_model import train
     train(args)
 
 model = get_model(args)
 blocks = read_disk(args)
 pred_probability = infer(model, blocks)
 output_predictions(args, pred_probability)
-print('Thanks for using!')
