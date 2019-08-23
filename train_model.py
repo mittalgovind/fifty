@@ -8,6 +8,7 @@ import os
 import random
 from hyperopt import partial, Trials, fmin, hp, tpe, rand
 from framework import load_labels_tags
+import pandas as pd
 
 model_name = ''
 new_model = ''
@@ -19,6 +20,7 @@ gpu = 1
 output = ''
 last_dense_layer = [75, 11, 25, 5, 2, 2]
 no_of_classes = last_dense_layer[scenario - 1]
+df = pd.DataFrame(columns=['accuracy', 'dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool'])
 
 
 def make_new_dataset(args):
@@ -60,9 +62,9 @@ def load_fft_75(args, data_dir=None):
     global model_name, dataset
     if data_dir is None:
         if args.block_size == 4096:
-            model_name = '4k_{}'.format( args.scenario)
+            model_name = '4k_{}'.format(args.scenario)
         else:
-            model_name = '512_{}'.format( args.scenario)
+            model_name = '512_{}'.format(args.scenario)
         data_dir = os.path.join(args.data_dir, model_name)
     else:
         model_name = args.new_model
@@ -76,6 +78,14 @@ def load_fft_75(args, data_dir=None):
     one_hot_y_val = to_categorical(y_val)
     print("Validation Data loaded with shape: {} and labels with shape - {}".format(x_val.shape, one_hot_y_val.shape))
     dataset = x_train, one_hot_y_train, x_val, one_hot_y_val
+
+
+def get_best():
+    best_idx = df['accuracy'].idxmax()
+    best = dict()
+    best['dense'], best['embed_size'], best['filter'], best['kernel'], best['layers'], best['pool'] = df.loc[best_idx][
+                                                                                                      1:]
+    return best
 
 
 def train_network(parameters):
@@ -108,22 +118,25 @@ def train_network(parameters):
             model = multi_gpu_model(model, gpus=gpu)
         model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
         model.summary()
-        history = model.fit(x=x_train[:int(len(x_train) * percent)],
-                            y=one_hot_y_train[:int(len(x_train) * percent)],
-                            epochs=50, batch_size=128, validation_data=(
+        history = model.fit(
+            x=x_train[:int(len(x_train) * percent)],
+            y=one_hot_y_train[:int(len(x_train) * percent)],
+            epochs=1, batch_size=128, validation_data=(
                 x_val[:int(len(x_val) * percent)], one_hot_y_val[:int(len(x_val) * percent)]),
-                            verbose=2, callbacks=callbacks_list)
-        score = min(history.history['val_loss'])
+            verbose=2, callbacks=callbacks_list)
+        loss = min(history.history['val_loss'])
         accuracy = max(history.history['val_acc'])
         backend.clear_session()
-    except RuntimeError:
+        parameters['accuracy'] = accuracy
+        df.loc[len(df)] = list(parameters.values())
+    except:
         accuracy = 0
-        score = np.inf
+        loss = np.inf
 
-    print("Final score: {}".format(score))
+    print("Loss: {}".format(loss))
     print("Accuracy: {:.2%}".format(accuracy))
 
-    return score
+    return 1 - accuracy / 100
 
 
 def train(args):
@@ -166,10 +179,10 @@ def train(args):
         hyper_algo,
         n_EI_candidates=1000,
         gamma=0.2,
-        n_startup_jobs=int(0.1*args.max_evals),
+        n_startup_jobs=int(0.1 * args.max_evals),
     )
 
-    best = fmin(
+    fmin(
         train_network,
         trials=trials,
         space=parameter_space,
@@ -177,8 +190,11 @@ def train(args):
         max_evals=args.max_evals,
         show_progressbar=False
     )
+    df.to_csv(os.path.join(args.output, 'parameters.csv'))
+    best = get_best()
 
-    print(args, best)
+    print('Hyper-parameter space exploration ended.')
+    print('Best hyper-parameters are: {}'.format(best))
     # retrain the best again on the full dataset
     args.percent = 1.0
     train_network(best)
