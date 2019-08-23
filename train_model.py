@@ -18,6 +18,7 @@ block_size = 4096
 scenario = 1
 gpu = 1
 output = ''
+verbose = 0
 last_dense_layer = [75, 11, 25, 5, 2, 2]
 no_of_classes = last_dense_layer[scenario - 1]
 df = pd.DataFrame(columns=['accuracy', 'dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool'])
@@ -83,8 +84,8 @@ def load_fft_75(args, data_dir=None):
 def get_best():
     best_idx = df['accuracy'].idxmax()
     best = dict()
-    best['dense'], best['embed_size'], best['filter'], best['kernel'], best['layers'], best['pool'] = df.loc[best_idx][
-                                                                                                      1:]
+    best['dense'], best['embed_size'], best['filter'], best['kernel'], best['layers'], best['pool'] = np.array(df.loc[best_idx][
+                                                                                                      1:]).astype(int)
     return best
 
 
@@ -93,6 +94,7 @@ def train_network(parameters):
     print(parameters)
     global dataset
     x_train, one_hot_y_train, x_val, one_hot_y_val = dataset
+
 
     try:
         model = Sequential()
@@ -123,7 +125,7 @@ def train_network(parameters):
             y=one_hot_y_train[:int(len(x_train) * percent)],
             epochs=1, batch_size=128, validation_data=(
                 x_val[:int(len(x_val) * percent)], one_hot_y_val[:int(len(x_val) * percent)]),
-            verbose=2, callbacks=callbacks_list)
+            verbose=verbose, callbacks=callbacks_list)
         loss = min(history.history['val_loss'])
         accuracy = max(history.history['val_acc'])
         backend.clear_session()
@@ -136,7 +138,7 @@ def train_network(parameters):
     print("Loss: {}".format(loss))
     print("Accuracy: {:.2%}".format(accuracy))
 
-    return 1 - accuracy / 100
+    return loss
 
 
 def train(args):
@@ -148,14 +150,20 @@ def train(args):
     else:
         load_fft_75(args)
 
+
     # updating global variables. train_network only takes one and only one argument.
-    global percent, block_size, scenario, gpu, output
+    global percent, block_size, scenario, gpu, output, verbose
     percent = args.percent
     block_size = args.block_size
     scenario = args.scenario
     gpu = args.gpus
     output = args.output
-
+    if args.v:
+        verbose = 0
+    elif args.vv:
+        verbose = 1
+    elif args.vvv :
+        verbose = 2
     parameter_space = {
         'layers': hp.choice('layers', [1, 2, 3]),
         'embed_size': hp.choice('embed_size', [16, 32, 48, 64]),
@@ -192,7 +200,7 @@ def train(args):
     )
     df.to_csv(os.path.join(args.output, 'parameters.csv'))
     best = get_best()
-
+    print('\n-------------------------------------\n')
     print('Hyper-parameter space exploration ended.')
     print('Best hyper-parameters are: {}'.format(best))
     # retrain the best again on the full dataset
