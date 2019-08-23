@@ -84,8 +84,12 @@ def load_fft_75(args, data_dir=None):
 def get_best():
     best_idx = df['accuracy'].idxmax()
     best = dict()
-    best['dense'], best['embed_size'], best['filter'], best['kernel'], best['layers'], best['pool'] = np.array(df.loc[best_idx][
-                                                                                                      1:]).astype(int)
+    best['dense'] = int(df['dense'].loc[best_idx])
+    best['embed_size'] = int(df['embed_size'].loc[best_idx])
+    best['filter'] = int(df['filter'].loc[best_idx])
+    best['kernel'] = int(df['kernel'].loc[best_idx])
+    best['layers'] = int(df['layers'].loc[best_idx])
+    best['pool'] = int(df['pool'].loc[best_idx])
     return best
 
 
@@ -149,8 +153,6 @@ def train(args):
             'Please refer documentation. Requires you to prepare the dataset on your own and then use -d option.')
     else:
         load_fft_75(args)
-
-
     # updating global variables. train_network only takes one and only one argument.
     global percent, block_size, scenario, gpu, output, verbose, new_model
     percent = args.percent
@@ -202,9 +204,8 @@ def train(args):
     df.to_csv(os.path.join(args.output, 'parameters.csv'))
     best = get_best()
     print('\n-------------------------------------\n')
-    print('Hyper-parameter space exploration ended.')
-    print('Best hyper-parameters are: {}'.format(best))
+    print('Hyper-parameter space exploration ended. \n Training the best again.')
     # retrain the best again on the full dataset
-    args.percent = 1.0
+    percent = 1
     train_network(best)
     print('The best model has been retrained and saved as {}.'.format(args.new_model))
