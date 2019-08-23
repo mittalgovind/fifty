@@ -69,8 +69,8 @@ def get_model(args):
             raise RuntimeError('Could not load the specified model!')
     elif args.new_model is not None:
         try:
-            if os.path.isfile(os.path.abspath(args.new_model)):
-                model = load_model(args.new_model)
+            if os.path.isfile(os.path.abspath(os.path.join(args.output, args.new_model))):
+                model = load_model(os.path.join(args.output, args.new_model))
             else:
                 raise FileNotFoundError('Could not find the specified model!')
         except RuntimeError:

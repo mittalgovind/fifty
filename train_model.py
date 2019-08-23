@@ -10,11 +10,12 @@ from hyperopt import partial, Trials, fmin, hp, tpe, rand
 from framework import load_labels_tags
 import pandas as pd
 
+random.seed(random.randint(0, 1000))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 model_name = ''
 new_model = ''
 dataset = ()
-percent = 0.35
+percent = 0.1
 block_size = 4096
 scenario = 1
 gpu = 1
@@ -27,16 +28,17 @@ df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 
 
 def make_new_dataset(args):
     labels, tags = load_labels_tags(1)
-    data_dir = os.path.join(args.output, 'data')
-    os.mkdir(data_dir)
-    data_dir = os.path.join(args.data_dir, '{}_1'.format(args.block_size))
+    out_data_dir = os.path.join(args.output, 'data')
+    os.mkdir(out_data_dir)
+    input_data_dir = os.path.join(args.data_dir, '{}_1'.format(args.block_size))
     global no_of_classes
-    with open(args.scale_down) as file_types:
-        file_types = list(file_types)
-        no_of_classes = len(file_types)
+    with open(args.scale_down) as req_types:
+        file_types = []
+        for line in req_types:
+            file_types.append(line[:-1])
         x, y = np.empty((0, args.block_size), dtype=np.uint8), np.empty(0, dtype=np.uint8)
         for file in ['train.npz', 'val.npz', 'test.npz']:
-            data = np.load(os.path.join(data_dir, file))
+            data = np.load(os.path.join(input_data_dir, file))
             x, y = np.concatenate((x, data['x'])), np.concatenate((y, data['y']))
         scale_down_x, scale_down_y = np.empty((0, args.block_size), dtype=np.uint8), np.empty(0, dtype=np.uint8)
         for file_type in file_types:
@@ -44,22 +46,23 @@ def make_new_dataset(args):
             indices = np.array([i for i in range(len(y)) if y[i] == index_ftype])
             scale_down_x = np.concatenate((scale_down_x, x[indices]))
             scale_down_y = np.concatenate((scale_down_y, y[indices]))
+        del x, y
         indices = np.arange(len(scale_down_y))
-        for i in range(100):
+        for i in range(10):
             random.shuffle(indices)
         scale_down_x = scale_down_x[indices]
         scale_down_y = scale_down_y[indices]
         split_train = int(len(scale_down_y) * 0.8)
         split_val = int(len(scale_down_y) * 0.9)
-        np.savez_compressed(os.path.join(data_dir, 'train.npz'), x=scale_down_x[:split_train],
+        np.savez_compressed(os.path.join(out_data_dir, 'train.npz'), x=scale_down_x[:split_train],
                             y=scale_down_y[:split_train])
-        np.savez_compressed(os.path.join(data_dir, 'val.npz'),
+        np.savez_compressed(os.path.join(out_data_dir, 'val.npz'),
                             x=scale_down_x[split_train: split_val], y=scale_down_y[split_train: split_val])
-        np.savez_compressed(os.path.join(data_dir, 'test.npz'), x=scale_down_x[split_val:], y=scale_down_y[split_val:])
-    load_fft_75(args, data_dir)
+        np.savez_compressed(os.path.join(out_data_dir, 'test.npz'), x=scale_down_x[split_val:], y=scale_down_y[split_val:])
+        load_dataset(args, out_data_dir)
 
 
-def load_fft_75(args, data_dir=None):
+def load_dataset(args, data_dir=None):
     """Loads relevant already prepared FFT-75 dataset"""
     global model_name, dataset
     if data_dir is None:
@@ -99,7 +102,6 @@ def train_network(parameters):
     print(parameters)
     global dataset
     x_train, one_hot_y_train, x_val, one_hot_y_val = dataset
-
 
     try:
         model = Sequential()
@@ -147,21 +149,25 @@ def train_network(parameters):
 
 
 def train(args):
-    if args.scale_down:
+    if args.data_dir:
+        load_dataset(args, args.data_dir)
+    elif args.scale_down:
         make_new_dataset(args)
     elif args.scale_up:
         raise SystemExit(
             'Please refer documentation. Requires you to prepare the dataset on your own and then use -d option.')
     else:
-        load_fft_75(args)
+        load_dataset(args)
     # updating global variables. train_network only takes one and only one argument.
-    global percent, block_size, scenario, gpu, output, verbose, new_model
+    global percent, block_size, scenario, gpu, output, verbose, new_model, no_of_classes
     percent = args.percent
     block_size = args.block_size
     scenario = args.scenario
     gpu = args.gpus
     output = args.output
     new_model = args.new_model
+    if args.scale_down:
+        no_of_classes = len(list(open(args.scale_down, 'r')))
     if args.v:
         verbose = 0
     elif args.vv:
@@ -190,7 +196,7 @@ def train(args):
     elif args.algo.lower() == 'rand':
         algo = rand.suggest
     else:
-        print('ERROR! The requested hyper-parameter algorithm is not supported. Using TPE.')
+        print('Warning! The requested hyper-parameter algorithm is not supported. Using TPE.')
         algo = partial(
             tpe.suggest,
             n_EI_candidates=1000,
@@ -210,7 +216,6 @@ def train(args):
     best = get_best()
     print('\n-------------------------------------\n')
     print('Hyper-parameter space exploration ended. \nRetraining the best again on the full dataset.')
-    #
     percent = 1
     train_network(best)
     print('The best model has been retrained and saved as {}.'.format(args.new_model))

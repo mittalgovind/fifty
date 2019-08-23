@@ -34,8 +34,8 @@ train_group.add_argument('-a', '--algo', type=str, default='tpe',
                          help='Algorithm to use for hyper-parameter optimization (tpe or rand). (default: tpe)')
 train_group.add_argument('-g', '--gpus', type=int, default=1,
                          help='Number of GPUs to use for training (if any). (default: 1)')
-train_group.add_argument('-p', '--percent', type=float, default=0.35,
-                         help='Percentage of training data to use. (default: 0.35)')
+train_group.add_argument('-p', '--percent', type=float, default=0.1,
+                         help='Percentage of training data to use. (default: 0.1)')
 train_group.add_argument('-n', '--max-evals', type=int, default=225,
                          help='Number of networks to evaluate. (default: 225)')
 train_group.add_argument('-sd', '--scale-down', type=str,
