@@ -152,12 +152,13 @@ def train(args):
 
 
     # updating global variables. train_network only takes one and only one argument.
-    global percent, block_size, scenario, gpu, output, verbose
+    global percent, block_size, scenario, gpu, output, verbose, new_model
     percent = args.percent
     block_size = args.block_size
     scenario = args.scenario
     gpu = args.gpus
     output = args.output
+    new_model = args.new_model
     if args.v:
         verbose = 0
     elif args.vv:
@@ -206,4 +207,4 @@ def train(args):
     # retrain the best again on the full dataset
     args.percent = 1.0
     train_network(best)
-    print('The best model has been retrained and saved as {}.'.format(args.model_name))
+    print('The best model has been retrained and saved as {}.'.format(args.new_model))
