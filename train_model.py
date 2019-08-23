@@ -10,6 +10,7 @@ from hyperopt import partial, Trials, fmin, hp, tpe, rand
 from framework import load_labels_tags
 import pandas as pd
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 model_name = ''
 new_model = ''
 dataset = ()
@@ -21,7 +22,7 @@ output = ''
 verbose = 0
 last_dense_layer = [75, 11, 25, 5, 2, 2]
 no_of_classes = last_dense_layer[scenario - 1]
-df = pd.DataFrame(columns=['accuracy', 'dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool'])
+df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
 
 
 def make_new_dataset(args):
@@ -204,7 +205,7 @@ def train(args):
     df.to_csv(os.path.join(args.output, 'parameters.csv'))
     best = get_best()
     print('\n-------------------------------------\n')
-    print('Hyper-parameter space exploration ended. \n Training the best again.')
+    print('Hyper-parameter space exploration ended. \nTraining the best again.')
     # retrain the best again on the full dataset
     percent = 1
     train_network(best)
