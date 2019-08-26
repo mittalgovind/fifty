@@ -84,7 +84,7 @@ def get_model(args):
             args.model_name = '{}_{}.h5'.format(args.block_size, args.scenario)
             if args.light:
                 if args.model_name == '4096_1.h5':
-                    args.model_name = '4096_lite.h5'
+                    args.model_name = '4096_1_lighter.h5'
                 else:
                     print('Warning! Lighter version of this case is not available. Using the standard version.')
             model = load_model('models/{}'.format(args.model_name))
