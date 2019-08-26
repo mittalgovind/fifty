@@ -6,28 +6,48 @@ import numpy as np
 from keras.models import load_model
 import time
 import shutil
+from pathlib import Path
 
 
-def read_disk(args):
-    """Reads the data disk for inference"""
+def read_file(path, block_size):
+    data = open(path, 'rb').read()
+    if len(data) < block_size:
+        print('Skipping {}. Smaller than one block size ({} bytes). Try smaller block size.'.format(path, block_size))
+        return
+    bound = (len(data) // block_size) * block_size
+    data = data[:bound]
+    file = np.array(list(data), dtype=np.uint8).reshape((-1, block_size))
+    del data
+    return file
+
+
+def read_files(args):
+    """Reads the data disk or folder for inference"""
+    files = []
     try:
-        data = open(args.disk_name, 'rb').read()
-        if len(data) < args.block_size:
-            print('File too small for classification.')
-        bound = (len(data) // args.block_size) * args.block_size
-        data = data[:bound]
-        # convert data into an ndarray of shape - (Samples, Block size)
-        blocks = np.array(list(data), dtype=np.uint8).reshape((-1, args.block_size))
-        del data
+        if os.path.isfile(os.path.abspath(args.input)):
+            file = read_file(args.input, args.block_size)
+            if file:
+                files.append(file)
+        elif os.path.exists(os.path.abspath(args.input)):
+            if args.recursive:
+                pattern = '**/*'
+            else:
+                pattern = './*'
+            for path in Path(type_path).glob(pattern):
+                if os.path.isfile(os.path.abspath(args.input)):
+                    file = read_file(path, args.block_size)
+                    if file:
+                        files.append(file)
     except RuntimeError:
-        raise RuntimeError("Unable to read {}".format(args.disk_name))
-    return blocks
+        raise RuntimeError("Unable to read {}".format(args.input))
+    return files
 
 
 def make_output_folder(args):
     """Prepares output folder"""
     if not args.output:
-        disk_name = os.path.abspath(args.disk_name)
+        disk_name = os.path.abspath(args.input)
         match = re.match(r"(.*/[A-Za-z0-9_-]+)\..*", disk_name)
         if match:
             args.output = match.group(1)
@@ -91,19 +111,23 @@ def get_model(args):
         except RuntimeError:
             raise RuntimeError('Model unavailable for block size of {} bytes and scenario {}.'.format(args.block_size,
                                                                                                       args.scenario))
-    print('Loaded model: {}. \nSummary of model:'.format(args.model_name))
-    model.summary()
+    if args.vvv:
+        print('Loaded model: {}. \nSummary of model:'.format(args.model_name))
+        model.summary()
     return model
 
 
 def infer(model, blocks):
     """Runs the model on the disk image"""
-    print('Predicting..... Please be patient!')
+    if args.vvv:
+        print('Predicting..... Please be patient!')
     tic = time.perf_counter()
     pred_probability = model.predict_proba(blocks)
     toc = time.perf_counter()
-    print('Inference time per sample = {} ms'.format((toc - tic) * 1000 / len(blocks)))
-    print('Prediction complete!')
+    if args.vvv:
+        print('Inference time per sample = {} ms'.format((toc - tic) * 1000 / len(blocks)))
+        print('Prediction complete!')
+
     return pred_probability
 
 
@@ -135,5 +159,6 @@ def output_predictions(args, pred_probability):
     else:
         df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
     out_file.close()
-    print("Written to {}/output.csv.".format(args.output))
+    if args.vv:
+        print("Written to {}/output.csv.".format(args.output))
     return
