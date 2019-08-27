@@ -18,6 +18,7 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     install_requires=[
+	'''
         'pandas',
         'numpy',
         'tensorflow',
@@ -25,6 +26,7 @@ setup(
         'pathlib',
         'hyperopt',
         'docopt',
+	'''
     ],
     packages=['fifty'],
     zip_safe=False,

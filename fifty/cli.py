@@ -1,14 +1,11 @@
-from __init__ import __version__ as VERSION
-
-import sys
-sys.path.append('..')
+from .__init__ import __version__ as VERSION
 
 
 def main():
     import os
     import sys
     import argparse
-    from utilities.framework import make_output_folder, get_model, read_files, infer, output_predictions
+    from .utilities.framework import make_output_folder, get_model, read_files, infer, output_predictions
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     parser = argparse.ArgumentParser(description='FiFTy: File-Fragment Type Classifier using Neural Networks')
 
