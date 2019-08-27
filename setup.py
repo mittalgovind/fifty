@@ -27,6 +27,6 @@ setup(
     packages=['fifty'],
     zip_safe=False,
     entry_points={
-        'console_scripts': ['fifty=fifty:main'],
+        'console_scripts': ['fifty=fifty.cli:main'],
     }
 )
