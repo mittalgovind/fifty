@@ -1,16 +1,18 @@
-from . import __version__
+from __init__ import __version__ as VERSION
+
+import sys
+sys.path.append('..')
 
 
 def main():
     import os
     import sys
     import argparse
-    from framework import make_output_folder, get_model, read_files, infer, output_predictions
+    from utilities.framework import make_output_folder, get_model, read_files, infer, output_predictions
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     parser = argparse.ArgumentParser(description='FiFTy: File-Fragment Type Classifier using Neural Networks')
-    classifier_group = parser.add_argument_group('Classification Options')
-    train_group = parser.add_argument_group('Training Options')
 
+    classifier_group = parser.add_argument_group('Classification Options')
     classifier_group.add_argument('-i', '--input', type=str, help='Input disk image file or folder')
     classifier_group.add_argument('-r', '--recursive', action='store_true',
                                   help='Recursively infer all files in folder.')
@@ -32,6 +34,7 @@ def main():
     classifier_group.add_argument('-m', '--model-name', type=str, default=None,
                                   help='Path to an explicit model to use for inference.')
 
+    train_group = parser.add_argument_group('Training Options')
     train_group.add_argument('-t', '--train', action='store_true', help='Train a new model')
     train_group.add_argument('-nm', '--new-model', type=str, default=None,
                              help='Name of the new model to train.')

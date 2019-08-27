@@ -1,8 +1,9 @@
 from setuptools import setup
+from fifty.__init__ import __version__ as VERSION
 
 setup(
     name='fifty',
-    version=__version__,
+    version=VERSION,
     description='FiFTy: Large-scale File Fragment Type Identification using Neural Networks',
     url='https://github.com/mittalgovind/fifty',
     author='Govind Mittal & Pawel Korus',
@@ -23,6 +24,7 @@ setup(
         'keras',
         'pathlib',
         'hyperopt',
+        'docopt',
     ],
     packages=['fifty'],
     zip_safe=False,
