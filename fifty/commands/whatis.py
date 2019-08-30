@@ -116,7 +116,6 @@ class WhatIs:
         output += ')'
         print(output)
 
-        # set_trace()
 
         out_file = open(os.path.join(self.output, 'output.csv'), 'w')
         if self.verbose == 3:

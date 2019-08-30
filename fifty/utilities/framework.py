@@ -6,6 +6,7 @@ import numpy as np
 import time
 import shutil
 from pathlib import Path
+from pdb import set_trace
 
 
 def read_file(path, block_size):
@@ -46,11 +47,18 @@ def read_files(input, block_size, recursive):
 def make_output_folder(input, output, force):
     """Prepares output folder"""
     if not output:
-        match = re.match(r"(.*/[A-Za-z0-9_-]+)\..*", input)
-        if match:
-            output = match.group(1)
+        if os.path.isfile(input):
+            match = re.match(r"(.*/[A-Za-z0-9_-]+)\..*", input)
+            if match:
+                output = match.group(1)
+            else:
+                output = './output'
         else:
-            output = './output'
+            match = re.match(r"(.*/)([A-Za-z0-9_-]+)", input)
+            if match:
+                output = '{}fifty_{}'.format(match.group(1), match.group(2))
+            else:
+                output = './output'
 
     output = os.path.abspath(output)
     if os.path.exists(output):
