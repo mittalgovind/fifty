@@ -18,19 +18,18 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     install_requires=[
-	'''
-        'pandas',
-        'numpy',
-        'tensorflow',
-        'keras',
-        'pathlib',
-        'hyperopt',
-        'docopt',
-	'''
+        # 'pandas',
+        # 'numpy',
+        # 'tensorflow',
+        # 'keras',
+        # 'pathlib',
+        # 'hyperopt',
+        # 'docopt',
     ],
-    packages=['fifty'],
+    packages=['fifty', 'fifty.utilities', 'fifty.commands', 'fifty.utilities.models'],
     zip_safe=False,
     entry_points={
         'console_scripts': ['fifty=fifty.cli:main'],
-    }
+    },
+    include_package_data=True,
 )

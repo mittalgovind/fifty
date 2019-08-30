@@ -1,69 +1,54 @@
-from .__init__ import __version__ as VERSION
+"""
+FiFTy: File-Fragment Type Classifier using Neural Networks
+
+Usage:
+  fifty whatis <input> [-r] [-b BLOCK_SIZE] [-s SCENARIO] [--block-wise] [-o OUTPUT] [-f] [-l] [-v] [-vv] [-vvv] [-m MODEL_NAME]
+  fifty train [-d DATA_DIR] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [--down SCALE_DOWN] [--up]
+  fifty -h | --help
+  fifty --version
+
+Options:
+  -h --help                                 Show this screen.
+  --version                                 Show version.
+  -r, --recursive                           Recursively infer all files in folder. [default: False]
+  --block-wise                              Do block-by-block classification. [default: False]
+  -b BLOCK_SIZE, --block-size BLOCK_SIZE    For inference, valid block sizes --  512 and 4096 bytes. For training, a positive integer. [default: 4096]
+  -s SCENARIO, --scenario SCENARIO          Scenario to assume while classifying. Please refer README for more info. [default: 1]
+  -o OUTPUT, --output OUTPUT                Output folder. (default: disk_name)
+  -f, --force                               Overwrite output folder, if exists. [default: False]
+  -l, --light                               Run a lighter version of scenario #1/4096. [default: False]
+  -v                                        Controls verbosity of outputs. Multiple -v options increase it. Maximum is 3. [default: 0]
+  -m MODEL_NAME, --model-name MODEL_NAME    During inference, path to an explicit model to use. During training, name of the new model (default: new_model).
+
+  -d DATA_DIR, --data-dir DATA_DIR          Path to the FFT-75 data. Please extract to it to a folder before continuing. [default: ./data]
+  -a ALGO, --algo ALGO                      Algorithm to use for hyper-parameter optimization (tpe or rand). [default: tpe]
+  -g GPUS, --gpus GPUS                      Number of GPUs to use for training (if any). [default: 1]
+  -p PERCENT, --percent PERCENT             Percentage of training data to use. [default: 0.1]
+  -n MAX_EVALS, --max-evals MAX_EVALS       Number of networks to evaluate. [default: 225]
+  --down SCALE_DOWN                         Path to file with specific filetypes (from our list of 75 filetypes). See utilities/scale_down.txt for reference.
+  --up                                      Train with newer filetypes. Please refer documentation. [default: False]
+
+"""
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+from . import __version__ as VERSION
+from inspect import getmembers, isclass
+from docopt import docopt
+from pdb import set_trace
 
 
 def main():
-    import os
-    import sys
     import argparse
-    from .utilities.framework import make_output_folder, get_model, read_files, infer, output_predictions
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    parser = argparse.ArgumentParser(description='FiFTy: File-Fragment Type Classifier using Neural Networks')
+    import fifty.commands as commands
+    options = docopt(__doc__, version=VERSION)
+    print(options)
 
-    classifier_group = parser.add_argument_group('Classification Options')
-    classifier_group.add_argument('-i', '--input', type=str, help='Input disk image file or folder')
-    classifier_group.add_argument('-r', '--recursive', action='store_true',
-                                  help='Recursively infer all files in folder.')
-    classifier_group.add_argument('-bw', '--block-wise', action='store_true', help='Do block-by-block classification.')
-    classifier_group.add_argument('-b', '--block-size', type=int, default=4096,
-                                  help='Valid block sizes -- 512 and 4096 bytes. (default: 4096)')
-    classifier_group.add_argument('-s', '--scenario', type=int, default=1,
-                                  help='Scenario to assume while classifying. \
-                                   Please refer README for for more info. (default: 1)')
-    classifier_group.add_argument('-o', '--output', type=str, help='Output folder. (default: disk_name)')
-    classifier_group.add_argument('-f', '--force', action='store_true', help='Overwrite output folder, if exists.')
-    classifier_group.add_argument('-l', '--light', action='store_true',
-                                  help='Run a lighter version of scenario #1/4096.')
-    classifier_group.add_argument('-v', action='store_true', help='Outputs class number and class label.')
-    classifier_group.add_argument('-vv', action='store_true',
-                                  help='Outputs class number and class label and probability.')
-    classifier_group.add_argument('-vvv', action='store_true',
-                                  help='Outputs class number and class label, probability and tag.')
-    classifier_group.add_argument('-m', '--model-name', type=str, default=None,
-                                  help='Path to an explicit model to use for inference.')
+    for k, v in options.items():
+        if hasattr(commands, k):
+            module = getattr(commands, k)
+            commands = getmembers(module, isclass)
+            command = [command[1] for command in commands if command[0] != 'Base'][0]
+            command = command(options)
+            command.run()
 
-    train_group = parser.add_argument_group('Training Options')
-    train_group.add_argument('-t', '--train', action='store_true', help='Train a new model')
-    train_group.add_argument('-nm', '--new-model', type=str, default=None,
-                             help='Name of the new model to train.')
-    train_group.add_argument('-d', '--data-dir', type=str, default='./data',
-                             help='Path to the FFT-75 data. \
-                                  Please extract to ./data before continuing. (default: ./data)')
-    train_group.add_argument('-a', '--algo', type=str, default='tpe',
-                             help='Algorithm to use for hyper-parameter optimization (tpe or rand). (default: tpe)')
-    train_group.add_argument('-g', '--gpus', type=int, default=1,
-                             help='Number of GPUs to use for training (if any). (default: 1)')
-    train_group.add_argument('-p', '--percent', type=float, default=0.1,
-                             help='Percentage of training data to use. (default: 0.1)')
-    train_group.add_argument('-n', '--max-evals', type=int, default=225,
-                             help='Number of networks to evaluate. (default: 225)')
-    train_group.add_argument('-sd', '--scale-down', type=str,
-                             help='Path to file with specific filetypes (from our list of 75 filetypes')
-    train_group.add_argument('-su', '--scale-up', action='store_true',
-                             help='Train with newer filetypes. Please refer documentation.')
-    args = parser.parse_args()
-
-    if args.input is None:
-        parser.print_usage()
-        sys.exit(1)
-
-    make_output_folder(args)
-
-    if args.train:
-        from train_model import train
-        train(args)
-
-    model = get_model(args)
-    files = read_files(args)
-    for file in files:
-        pred_probability = infer(model, file)
-        output_predictions(args, pred_probability)

@@ -3,7 +3,6 @@ import re
 import json
 import pandas as pd
 import numpy as np
-from keras.models import load_model
 import time
 import shutil
 from pathlib import Path
@@ -21,54 +20,53 @@ def read_file(path, block_size):
     return file
 
 
-def read_files(args):
+def read_files(input, block_size, recursive):
     """Reads the data disk or folder for inference"""
     files = []
     try:
-        if os.path.isfile(os.path.abspath(args.input)):
-            file = read_file(args.input, args.block_size)
-            if file:
+        if os.path.isfile(input):
+            file = read_file(input, block_size)
+            if file is not None:
                 files.append(file)
-        elif os.path.exists(os.path.abspath(args.input)):
-            if args.recursive:
+        elif os.path.exists(input):
+            if recursive:
                 pattern = '**/*'
             else:
                 pattern = './*'
             for path in Path(type_path).glob(pattern):
-                if os.path.isfile(os.path.abspath(args.input)):
-                    file = read_file(path, args.block_size)
+                if os.path.isfile(input):
+                    file = read_file(path, block_size)
                     if file:
                         files.append(file)
-    except RuntimeError:
-        raise RuntimeError("Unable to read {}".format(args.input))
+    except:
+        raise Error("Unable to read {}".format(input))
     return files
 
 
-def make_output_folder(args):
+def make_output_folder(input, output, force):
     """Prepares output folder"""
-    if not args.output:
-        disk_name = os.path.abspath(args.input)
-        match = re.match(r"(.*/[A-Za-z0-9_-]+)\..*", disk_name)
+    if not output:
+        match = re.match(r"(.*/[A-Za-z0-9_-]+)\..*", input)
         if match:
-            args.output = match.group(1)
+            output = match.group(1)
         else:
-            args.output = './output'
+            output = './output'
 
-    args.output = os.path.abspath(args.output)
-    if os.path.exists(args.output):
-        if args.force:
+    output = os.path.abspath(output)
+    if os.path.exists(output):
+        if force:
             print("Warning! The output folder is being overwritten.")
-            shutil.rmtree(args.output)
+            shutil.rmtree(output)
         else:
             raise BlockingIOError("The output folder already exists. Use -f to overwrite it completely.")
-    os.mkdir(args.output)
-    return
+    os.mkdir(output)
+    return output
 
 
 def load_labels_tags(scenario):
     """Loads class labels and tags"""
-    if os.path.isfile('labels.json'):
-        with open('labels.json') as json_file:
+    if os.path.isfile('fifty/utilities/labels.json'):
+        with open('fifty/utilities/labels.json') as json_file:
             classes = json.load(json_file)
             labels = classes[str(scenario)]
             tags = classes['tags']
@@ -76,89 +74,3 @@ def load_labels_tags(scenario):
         raise FileNotFoundError('Please download labels.json to the current directory!')
     return labels, tags
 
-
-def get_model(args):
-    """Finds and returns a relevant pre-trained model"""
-    if args.model_name is not None:
-        try:
-            if os.path.isfile(os.path.abspath(args.model_name)):
-                model = load_model(args.model_name)
-            else:
-                raise FileNotFoundError('Could not find the specified model! {}'.format(args.model_name))
-        except RuntimeError:
-            raise RuntimeError('Could not load the specified model! {}'.format(args.model_name))
-    elif args.new_model is not None:
-        try:
-            if os.path.isfile(os.path.abspath(os.path.join(args.output, args.new_model))):
-                model = load_model(os.path.join(args.output, args.new_model))
-            else:
-                raise FileNotFoundError('Could not find the specified model!')
-        except RuntimeError:
-            raise RuntimeError('Could not load the specified model!')
-    else:
-        if args.block_size not in [512, 4096]:
-            raise ValueError('Invalid block size!')
-        if args.scenario not in range(1, 7):
-            raise ValueError('Invalid scenario!')
-        try:
-            args.model_name = '{}_{}.h5'.format(args.block_size, args.scenario)
-            if args.light:
-                if args.model_name == '4096_1.h5':
-                    args.model_name = '4096_1_lighter.h5'
-                else:
-                    print('Warning! Lighter version of this case is not available. Using the standard version.')
-            model = load_model('models/{}'.format(args.model_name))
-        except RuntimeError:
-            raise RuntimeError('Model unavailable for block size of {} bytes and scenario {}.'.format(args.block_size,
-                                                                                                      args.scenario))
-    if args.vvv:
-        print('Loaded model: {}. \nSummary of model:'.format(args.model_name))
-        model.summary()
-    return model
-
-
-def infer(model, blocks):
-    """Runs the model on the disk image"""
-    if args.vvv:
-        print('Predicting..... Please be patient!')
-    tic = time.perf_counter()
-    pred_probability = model.predict_proba(blocks)
-    toc = time.perf_counter()
-    if args.vvv:
-        print('Inference time per sample = {} ms'.format((toc - tic) * 1000 / len(blocks)))
-        print('Prediction complete!')
-
-    return pred_probability
-
-
-def output_predictions(args, pred_probability):
-    """Saves prediction in relevant format to disk"""
-    labels, tags = load_labels_tags(args.scenario)
-    pred_class = np.argmax(pred_probability, axis=1)
-    pred_label = [labels[i] for i in pred_class]
-    pred_probability = np.round(np.max(pred_probability, axis=1) * 100, decimals=1)
-    tags = [tags[i] for i in pred_class]
-    df = pd.DataFrame(
-        {'Class Number': pred_class, 'Class Label': pred_label,
-         'Class Probability': pred_probability, 'Tag': tags},
-        columns=['Class Number', 'Class Label', 'Class Probability', 'Tag'])
-    out_file = open(os.path.join(args.output, 'output.csv'), 'w')
-
-    if args.v:
-        df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number', 'Class Label'])
-    elif args.vv:
-        df.to_csv(out_file, sep=',', encoding='utf-8', index=False,
-                  columns=['Class Number', 'Class Label', 'Class Probability'])
-    elif args.vvv:
-        if args.scenario == 1:
-            df.to_csv(out_file, sep=',', encoding='utf-8', index=False)
-        else:
-            print('The output of this scenario will not contain tags.')
-            df.to_csv(out_file, sep=',', encoding='utf-8', index=False,
-                      columns=['Class Number', 'Class Label', 'Class Probability'])
-    else:
-        df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
-    out_file.close()
-    if args.vv:
-        print("Written to {}/output.csv.".format(args.output))
-    return

@@ -3,7 +3,11 @@ exclude .gitignore
 exclude .coverage
 exclude .travis.yml
 include README.rst
-include setup.cfg
+include setup.
+exclude test.py
+include fifty/utilities/models/*.h5
+include fifty/utilities/*.json
+include fifty/utilities/scale_down.txt
 prune .cache
 prune .git
 prune build
