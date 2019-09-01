@@ -51,12 +51,12 @@ class Train:
 
         if self.input is not None:
             model = get_model()
-            files = read_files(self.input, self.block_size, self.recursive)
+            files, file_names = read_files(self.input, self.block_size, self.recursive)
             from fifty.commands.whatis import WhatIs
             classifier = WhatIs(self.args)
-            for file in files:
+            for file, file_name in zip(files, file_names):
                 pred_probability = classifier.infer(model, file)
-                classifier.output_predictions(pred_probability)
+                classifier.output_predictions(pred_probability, file_name)
         else:
             print('No input file given for inference on trained model.')
         return

@@ -13,7 +13,7 @@ def read_file(path, block_size):
     data = open(path, 'rb').read()
     if len(data) < block_size:
         print('Skipping {}. Smaller than one block size ({} bytes). Try smaller block size.'.format(path, block_size))
-        return
+        return None
     bound = (len(data) // block_size) * block_size
     data = data[:bound]
     file = np.array(list(data), dtype=np.uint8).reshape((-1, block_size))
@@ -23,38 +23,46 @@ def read_file(path, block_size):
 
 def read_files(input, block_size, recursive):
     """Reads the data disk or folder for inference"""
-    files = []
+    blocks = []
+    file_names = []
+    name_pattern = re.compile(r".*/(.+\..*)")
     try:
         if os.path.isfile(input):
-            file = read_file(input, block_size)
-            if file is not None:
-                files.append(file)
+            file_blocks = read_file(input, block_size)
+            if file_blocks is not None:
+                blocks.append(file_blocks)
+                file_names.append(input)
         elif os.path.exists(input):
             if recursive:
                 pattern = '**/*'
             else:
                 pattern = './*'
-            for path in Path(type_path).glob(pattern):
-                if os.path.isfile(input):
-                    file = read_file(path, block_size)
-                    if file:
-                        files.append(file)
+            for path in Path(input).glob(pattern):
+                if os.path.isfile(path):
+                    file_block = read_file(path, block_size)
+                    if file_block is not None:
+                        try:
+                            file_name = name_pattern.match(str(path)).group(1)
+                        except:
+                            file_name = 'non-alphanumeric-name.xyz'
+                        blocks.append(file_block)
+                        file_names.append(file_name)
     except:
-        raise Error("Unable to read {}".format(input))
-    return files
+        raise RuntimeError("Unable to read {}".format(input))
+    return blocks, file_names
 
 
 def make_output_folder(input, output, force):
     """Prepares output folder"""
     if not output:
         if os.path.isfile(input):
-            match = re.match(r"(.*/[A-Za-z0-9_-]+)\..*", input)
+            match = re.match(r".*/(.+)i", input)
             if match:
                 output = match.group(1)
             else:
                 output = './output'
         else:
-            match = re.match(r"(.*/)([A-Za-z0-9_-]+)", input)
+            match = re.match(r"(.*/)(.+)", input)
             if match:
                 output = '{}fifty_{}'.format(match.group(1), match.group(2))
             else:

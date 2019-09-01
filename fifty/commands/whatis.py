@@ -39,12 +39,13 @@ class WhatIs:
             parser.print_usage()
             sys.exit(1)
 
-        self.output = make_output_folder(self.input, self.output, self.force)
+        if self.verbose >= 1:
+            self.output = make_output_folder(self.input, self.output, self.force)
         model = self.get_model()
-        files = read_files(self.input, self.block_size, self.recursive)
-        for file in files:
+        files, file_names = read_files(self.input, self.block_size, self.recursive)
+        for file, file_name in zip(files, file_names):
             pred_probability = self.infer(model, file)
-            self.output_predictions(pred_probability)
+            self.output_predictions(pred_probability, file_name)
         return
 
     def get_model(self):
@@ -91,7 +92,7 @@ class WhatIs:
             print('Prediction complete!')
         return pred_probability
 
-    def output_predictions(self, pred_probability):
+    def output_predictions(self, pred_probability, file_name):
         """Saves prediction in relevant format to disk"""
         labels, tags = load_labels_tags(self.scenario)
         pred_class = np.argmax(pred_probability, axis=1)
@@ -104,26 +105,31 @@ class WhatIs:
                 'Class Label': pred_label,
                 'Class Probability': pred_probability,
                 'Tag': tags
-             },
+            },
             columns=['Class Number', 'Class Label', 'Class Probability', 'Tag']
         )
 
         top_labels = df['Class Label'].value_counts()[:4]
         top_labels *= 100/top_labels.sum()
-        output = '{}: ('.format(self.file_name)
+        output = '{}: ('.format(file_name)
         for label, percent  in top_labels.items():
             output += '{}: {:.1f}, '.format(label.upper(), percent)
-        output += ')'
-        print(output)
+
+        print('{})'.format(output[:-2]))
 
 
-        out_file = open(os.path.join(self.output, 'output.csv'), 'w')
+        try:
+            if '.' in file_name:
+                file_name = file_name[:file_name.rfind('.')]
+            out_file = open(os.path.join(self.output, '{}.csv'.format(file_name)), 'w')
+        except:
+            set_trace()
         if self.verbose == 3:
             df.to_csv(out_file, sep=',', encoding='utf-8', index=False)
         elif self.verbose == 1:
             df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
         out_file.close()
-        if self.verbose >= 2:
-            print("Written to {}/output.csv.".format(self.output))
+        # if self.verbose == 2:
+        # print("Written to {}/output.csv.".format(self.output))
         return
 
