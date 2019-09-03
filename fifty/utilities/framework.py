@@ -20,7 +20,7 @@ def read_file(path, block_size):
         return None
     bound = (len(data) // block_size) * block_size
     data = data[:bound]
-    file = np.array(list(data), dtype=np.uint8).reshape((-1, block_size))
+    file = np.array(np.array(list(data), dtype=np.uint8).reshape((-1, block_size)))
     del data
     return file
 
@@ -28,27 +28,27 @@ def read_file(path, block_size):
 def read_files(input, block_size, recursive):
     """Reads the data disk or folder for inference"""
     name_pattern = re.compile(r".*/(.+\..*)")
-    try:
-        if os.path.isfile(input):
-            file_block = read_file(input, block_size)
-            if file_block is not None:
-                yield file_block, input
-        elif os.path.exists(input):
-            if recursive:
-                pattern = '**/*'
-            else:
-                pattern = './*'
-            for path in Path(input).glob(pattern):
-                if os.path.isfile(path):
-                    file_block = read_file(path, block_size)
-                    if file_block is not None:
-                        try:
-                            file_name = name_pattern.match(str(path)).group(1)
-                        except:
-                            file_name = 'non-alphanumeric-name.xyz'
-                        yield file_block, file_name
-    except:
-        raise RuntimeError("Unable to read {}".format(input))
+    # try:
+    if os.path.isfile(input):
+        file_block = read_file(input, block_size)
+        if file_block is not None:
+            yield file_block, input
+    elif os.path.exists(input):
+        if recursive:
+            pattern = '**/*'
+        else:
+            pattern = './*'
+        for path in Path(input).glob(pattern):
+            if os.path.isfile(path):
+                file_block = read_file(path, block_size)
+                if file_block is not None:
+                    try:
+                        file_name = name_pattern.match(str(path)).group(1)
+                    except:
+                        file_name = 'non-alphanumeric-name.xyz'
+                    yield file_block, file_name
+    # except:
+    #     raise RuntimeError("Unable to read {}".format(input))
 
 
 def make_output_folder(input, output, force):

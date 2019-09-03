@@ -55,9 +55,10 @@ class Train:
             classifier = WhatIs(self.args)
             gen_files = read_files(self.input, self.block_size, self.recursive)
             try:
-                file, file_name = next(gen_files)
-                pred_probability = classifier.infer(model, file)
-                classifier.output_predictions(pred_probability, file_name)
+                while True:
+                    file, file_name = next(gen_files)
+                    pred_probability = classifier.infer(model, file)
+                    classifier.output_predictions(pred_probability, file_name)
             except:
                 pass
         else:
