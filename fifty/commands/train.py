@@ -40,7 +40,7 @@ class Train:
         self.max_evals = int(options['--max-evals'])
         self.args = options
 
-        self.dataset = ()q
+        self.dataset = ()
         self.last_dense_layer = [75, 11, 25, 5, 2, 2]
         self.no_of_classes = last_dense_layer[scenario - 1]
         self.df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
@@ -51,12 +51,15 @@ class Train:
 
         if self.input is not None:
             model = get_model()
-            files, file_names = read_files(self.input, self.block_size, self.recursive)
             from fifty.commands.whatis import WhatIs
             classifier = WhatIs(self.args)
-            for file, file_name in zip(files, file_names):
+            gen_files = read_files(self.input, self.block_size, self.recursive)
+            try:
+                file, file_name = next(gen_files)
                 pred_probability = classifier.infer(model, file)
                 classifier.output_predictions(pred_probability, file_name)
+            except:
+                pass
         else:
             print('No input file given for inference on trained model.')
         return
