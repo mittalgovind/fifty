@@ -22,7 +22,7 @@ from fifty.utilities.framework import read_files, make_output_folder, load_label
 class Train:
 
     def __init__(self, options, *args):
-        random.seed(random.randint(0, 1000))q
+        random.seed(random.randint(0, 1000))
         self.input = os.path.abspath(options['<input>'])
         if options['--model-name'] is not None:
             self.model_name = os.path.abspath(options['--model-name'])
