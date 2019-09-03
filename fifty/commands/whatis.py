@@ -117,18 +117,18 @@ class WhatIs:
 
         print('{})'.format(output[:-2]))
 
-
-        try:
-            if '.' in file_name:
-                file_name = file_name[:file_name.rfind('.')]
-            out_file = open(os.path.join(self.output, '{}.csv'.format(file_name)), 'w')
-        except:
-            set_trace()
-        if self.verbose == 3:
-            df.to_csv(out_file, sep=',', encoding='utf-8', index=False)
-        elif self.verbose == 1:
-            df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
-        out_file.close()
+        if self.verbose >= 1:
+            try:
+                if '.' in file_name:
+                    file_name = file_name[:file_name.rfind('.')]
+                out_file = open(os.path.join(self.output, '{}.csv'.format(file_name)), 'w')
+            except:
+                set_trace()
+            if self.verbose == 3:
+                df.to_csv(out_file, sep=',', encoding='utf-8', index=False)
+            elif self.verbose == 1:
+                df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
+            out_file.close()
         # if self.verbose == 2:
         # print("Written to {}/output.csv.".format(self.output))
         return

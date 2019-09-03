@@ -6,7 +6,7 @@ setup(
     version=VERSION,
     description='FiFTy: Large-scale File Fragment Type Identification using Neural Networks',
     url='https://github.com/mittalgovind/fifty',
-    author='Govind Mittal & Pawel Korus',
+    author='Govind Mittal, Pawel Korus and Nasir Memon',
     author_email='mittal@nyu.edu',
     license='MIT',
     classifiers=[
