@@ -16,7 +16,7 @@ from keras.utils.np_utils import to_categorical
 from keras.utils import multi_gpu_model
 from hyperopt import partial, Trials, fmin, hp, tpe, rand
 
-from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
+from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
 
 
 class Train:

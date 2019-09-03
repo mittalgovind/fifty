@@ -11,7 +11,7 @@ import shutil
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.models import load_model
-from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
+from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
 
 from pdb import set_trace
 
@@ -70,7 +70,7 @@ class WhatIs:
                         self.model_name = '4096_1_lighter.h5'
                     else:
                         print('Warning! Lighter version of this case is not available. Using the standard version.')
-                model = load_model('fifty/utilities/models/{}'.format(self.model_name))
+                model = load_model(os.path.join(get_utilities_dir(), 'models/{}'.format(self.model_name)))
             except RuntimeError:
                 raise RuntimeError(
                     'Model unavailable for block size of {} bytes and scenario {}.'.format(self.block_size,

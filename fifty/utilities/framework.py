@@ -9,6 +9,10 @@ from pathlib import Path
 from pdb import set_trace
 
 
+def get_utilities_dir():
+    return os.path.dirname(__file__)
+
+
 def read_file(path, block_size):
     data = open(path, 'rb').read()
     if len(data) < block_size:
@@ -81,12 +85,12 @@ def make_output_folder(input, output, force):
 
 def load_labels_tags(scenario):
     """Loads class labels and tags"""
-    if os.path.isfile('fifty/utilities/labels.json'):
-        with open('fifty/utilities/labels.json') as json_file:
+    if os.path.isfile(os.path.join(get_utilities_dir(), 'labels.json')):
+        with open(os.path.join(get_utilities_dir(), 'labels.json')) as json_file:
             classes = json.load(json_file)
             labels = classes[str(scenario)]
             tags = classes['tags']
     else:
-        raise FileNotFoundError('Please download labels.json to the current directory!')
+        raise FileNotFoundError('Please download labels.json to {} directory!'.format(get_utilities_dir()))
     return labels, tags
 
