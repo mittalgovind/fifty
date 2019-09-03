@@ -42,10 +42,13 @@ class WhatIs:
         if self.verbose >= 1:
             self.output = make_output_folder(self.input, self.output, self.force)
         model = self.get_model()
-        files, file_names = read_files(self.input, self.block_size, self.recursive)
-        for file, file_name in zip(files, file_names):
+        gen_files = read_files(self.input, self.block_size, self.recursive)
+        try:
+            file, file_name = next(gen_files)
             pred_probability = self.infer(model, file)
             self.output_predictions(pred_probability, file_name)
+        except:
+            pass
         return
 
     def get_model(self):
@@ -111,11 +114,11 @@ class WhatIs:
 
         top_labels = df['Class Label'].value_counts()[:4]
         top_labels *= 100/top_labels.sum()
-        output = '{}: ('.format(file_name)
+        output = '{}: {'.format(file_name)
         for label, percent  in top_labels.items():
-            output += '{}: {:.1f}, '.format(label.upper(), percent)
+            output += '{}: {:.1f}%, '.format(label.upper(), percent)
 
-        print('{})'.format(output[:-2]))
+        print('{}}'.format(output[:-2]))
 
         if self.verbose >= 1:
             try:

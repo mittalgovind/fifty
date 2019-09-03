@@ -27,15 +27,12 @@ def read_file(path, block_size):
 
 def read_files(input, block_size, recursive):
     """Reads the data disk or folder for inference"""
-    blocks = []
-    file_names = []
     name_pattern = re.compile(r".*/(.+\..*)")
     try:
         if os.path.isfile(input):
-            file_blocks = read_file(input, block_size)
-            if file_blocks is not None:
-                blocks.append(file_blocks)
-                file_names.append(input)
+            file_block = read_file(input, block_size)
+            if file_block is not None:
+                yield file_block, input
         elif os.path.exists(input):
             if recursive:
                 pattern = '**/*'
@@ -49,11 +46,9 @@ def read_files(input, block_size, recursive):
                             file_name = name_pattern.match(str(path)).group(1)
                         except:
                             file_name = 'non-alphanumeric-name.xyz'
-                        blocks.append(file_block)
-                        file_names.append(file_name)
+                        yield file_block, file_name
     except:
         raise RuntimeError("Unable to read {}".format(input))
-    return blocks, file_names
 
 
 def make_output_folder(input, output, force):
