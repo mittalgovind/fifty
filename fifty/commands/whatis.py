@@ -9,6 +9,10 @@ import numpy as np
 import time
 import shutil
 import tensorflow as tf
+import seaborn as sns
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+
 tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.models import load_model
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
@@ -28,8 +32,9 @@ class WhatIs:
         self.force = options['--force']
         self.light = options['--light']
         self.verbose = int(options['-v'])
+        self.labels, self.tags = load_labels_tags(self.scenario)
         if options['--model-name'] is not None:
-            self.model_name = os.path.abspath(options['--model-name'])  
+            self.model_name = os.path.abspath(options['--model-name'])
         else:
             self.model_name = None
         self.args = args
@@ -44,13 +49,18 @@ class WhatIs:
         model = self.get_model()
 
         gen_files = read_files(self.input, self.block_size, self.recursive)
+        if self.verbose == 2:
+            print('Predicting..... Please be patient!')
         try:
             while True:
                 file, file_name = next(gen_files)
                 pred_probability = self.infer(model, file)
                 self.output_predictions(pred_probability, file_name)
+                del file, file_name
         except:
             pass
+        if self.verbose == 2:
+            print('Prediction Complete!')
         return
 
     def get_model(self):
@@ -80,30 +90,79 @@ class WhatIs:
                 raise RuntimeError(
                     'Model unavailable for block size of {} bytes and scenario {}.'.format(self.block_size,
                                                                                            self.scenario))
-        if self.verbose == 3:
+        if self.verbose == 2:
             print('Loaded model: {}. \nSummary of model:'.format(self.model_name))
             model.summary()
         return model
 
     def infer(self, model, blocks):
         """Runs the model on the disk image"""
-        if self.verbose == 3:
-            print('Predicting..... Please be patient!')
         tic = time.perf_counter()
         pred_probability = model.predict_proba(blocks)
         toc = time.perf_counter()
-        if self.verbose == 3:
+        if self.verbose == 2:
             print('Inference time per sample = {} ms'.format((toc - tic) * 1000 / len(blocks)))
-            print('Prediction complete!')
         return pred_probability
+
+    def plot_maps(self, df, file_name):
+        width = 8
+        if self.scenario == 1:
+            cmap = plt.cm.viridis
+            fig, axes = plt.subplots(nrows=2, ncols=1)
+            # plotting class labels
+            class_numbers = np.array(df['Class Number'])
+            class_numbers = np.concatenate((class_numbers, 75 * np.ones(width - len(class_numbers) % width))).reshape(
+                (-1, width))
+            label_dict = dict([(label, i) for i, label in enumerate(self.labels)])
+            label_dict['empty'] = len(label_dict)
+            cmap = plt.cm.get_cmap('cubehelix', len(label_dict))
+            axes[0].imshow(class_numbers, cmap=cmap, vmin=0, vmax=len(self.labels))
+            # patches = [mpatches.Patch(color=cmap(v), label=k) for k, v in sorted(label_dict.items(), key=lambda t: t[1])
+            #            if v in class_numbers]
+            # axes[0].legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
+            axes[0].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+            axes[0].tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+
+            # plotting tags
+            tags = df['Tag']
+            tags_enum = []
+            tags_dict = dict([(tag, i) for i, tag in enumerate(np.unique(self.tags))])
+            tags_dict['empty'] = len(tags_dict)
+            for tag in tags:
+                tags_enum.append(tags_dict[tag])
+            tags_enum = np.array(tags_enum)
+            tags_enum = np.concatenate((
+                tags_enum, (len(tags_dict) - 1) * np.ones(width - len(tags_enum) % width))).reshape((-1, width))
+            cmap = plt.cm.get_cmap('cubehelix', len(tags_dict))
+            axes[1].imshow(tags_enum, cmap=cmap, vmin=0, vmax=len(tags_dict) - 1)
+            patches = [mpatches.Patch(color=cmap(v), label=k) for k, v in sorted(tags_dict.items(), key=lambda t: t[1])]
+            axes[1].legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
+            axes[1].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+            axes[1].tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+        else:
+            class_numbers = np.array(df['Class Number'])
+            label_dict = dict([(label, i) for i, label in enumerate(self.labels)])
+            label_dict['empty'] = len(label_dict)
+            class_numbers = np.concatenate(
+                (class_numbers, (len(label_dict) - 1) * np.ones(width - len(class_numbers) % width))).reshape((-1, width))
+            cmap = plt.cm.get_cmap('cubehelix', len(label_dict))
+            plt.imshow(class_numbers, cmap=cmap, vmin=0, vmax=len(self.labels))
+
+            patches = [mpatches.Patch(color=cmap(v), label=k) for k, v in sorted(label_dict.items(), key=lambda t: t[1])
+                       if v in class_numbers]
+            plt.legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
+            plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+            plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+        plt.savefig(file_name)
+        plt.cla()
+        return
 
     def output_predictions(self, pred_probability, file_name):
         """Saves prediction in relevant format to disk"""
-        labels, tags = load_labels_tags(self.scenario)
         pred_class = np.argmax(pred_probability, axis=1)
-        pred_label = [labels[i] for i in pred_class]
+        pred_label = [self.labels[i] for i in pred_class]
         pred_probability = np.round(np.max(pred_probability, axis=1) * 100, decimals=1)
-        tags = [tags[i] for i in pred_class]
+        tags = [self.tags[i] for i in pred_class]
         df = pd.DataFrame(
             {
                 'Class Number': pred_class,
@@ -114,27 +173,24 @@ class WhatIs:
             columns=['Class Number', 'Class Label', 'Class Probability', 'Tag']
         )
 
-        top_labels = df['Class Label'].value_counts()[:4]
-        top_labels *= 100/top_labels.sum()
-        output = '{}: {{'.format(file_name)
-        for label, percent  in top_labels.items():
-            output += '{}: {:.1f}%, '.format(label.upper(), percent)
+        if not self.block_wise:
+            top_labels = df['Class Label'].value_counts()[:4]
+            top_labels *= 100 / top_labels.sum()
+            output = '{}: {{'.format(file_name)
+            for label, percent in top_labels.items():
+                if percent >= 0.05:
+                    output += '{}: {:.1f}, '.format(label.upper(), percent)
+            print('{}}}'.format(output[:-2]))
 
-        print('{}}}'.format(output[:-2]))
-
-        if self.verbose >= 1:
-            try:
+        try:
+            if self.verbose >= 1 or self.block_wise:
                 if '.' in file_name:
-                    file_name = file_name[:file_name.rfind('.')]
-                out_file = open(os.path.join(self.output, '{}.csv'.format(file_name)), 'w')
-            except:
+                    file_name = '{}/{}'.format(self.output, file_name[:file_name.rfind('.')])
                 set_trace()
-            if self.verbose == 3:
-                df.to_csv(out_file, sep=',', encoding='utf-8', index=False)
-            elif self.verbose == 1:
-                df.to_csv(out_file, sep=',', encoding='utf-8', index=False, columns=['Class Number'])
-            out_file.close()
-        # if self.verbose == 2:
-        # print("Written to {}/output.csv.".format(self.output))
+                self.plot_maps(df, '{}.png'.format(file_name))
+            if self.verbose == 2:
+                df.to_csv('{}.csv'.format(file_name), sep=',', encoding='utf-8', index=False)
+                print("Written to {}.csv.".format(file_name))
+        except:
+            pass
         return
-

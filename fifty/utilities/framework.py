@@ -53,12 +53,12 @@ def read_files(input, block_size, recursive):
 def make_output_folder(input, output, force):
     """Prepares output folder"""
     if not output:
+        file_name = os.path.split(input)[1]
         if os.path.isfile(input):
-            match = re.match(r".*/(.+)i", input)
-            if match:
-                output = match.group(1)
+            if file_name.rfind('.') != -1:
+                output = file_name[:file_name.rfind('.')]
             else:
-                output = './output'
+                output = 'fifty_{}'.format(file_name)
         else:
             match = re.match(r"(.*/)(.+)", input)
             if match:

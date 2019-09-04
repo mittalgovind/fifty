@@ -59,6 +59,7 @@ class Train:
                     file, file_name = next(gen_files)
                     pred_probability = classifier.infer(model, file)
                     classifier.output_predictions(pred_probability, file_name)
+                    del file, file_name
             except:
                 pass
         else:
@@ -76,7 +77,7 @@ class Train:
                     raise FileNotFoundError('Could not find the specified model! {}'.format(self.model_name))
             except RuntimeError:
                 raise RuntimeError('Could not load the specified model! {}'.format(self.model_name))
-            if self.verbose == 3:
+            if self.verbose == 2:
                 print('Loaded model: {}. \nSummary of model:'.format(self.model_name))
                 model.summary()
         return model

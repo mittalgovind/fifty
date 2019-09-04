@@ -17,7 +17,7 @@ Options:
   -o OUTPUT, --output OUTPUT                Output folder. (default: disk_name)
   -f, --force                               Overwrite output folder, if exists. [default: False]
   -l, --light                               Run a lighter version of scenario #1/4096. [default: False]
-  -v                                        Controls verbosity of outputs. Multiple -v options increase it. Maximum is 3. [default: 0]
+  -v                                        Controls verbosity of outputs. Multiple v increases it. Maximum is 2. [default: 0]
   -m MODEL_NAME, --model-name MODEL_NAME    During inference, path to an explicit model to use. During training, name of the new model (default: new_model).
 
   -d DATA_DIR, --data-dir DATA_DIR          Path to the FFT-75 data. Please extract to it to a folder before continuing. [default: ./data]
