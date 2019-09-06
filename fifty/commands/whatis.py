@@ -11,8 +11,9 @@ import shutil
 import tensorflow as tf
 import seaborn as sns
 import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
-
+import matplotlib.pylab as plt
+from matplotlib import rcParams, cycler
+import matplotlib as mpl
 tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.models import load_model
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
@@ -49,7 +50,7 @@ class WhatIs:
         model = self.get_model()
 
         gen_files = read_files(self.input, self.block_size, self.recursive)
-        if self.verbose == 2:
+        if self.verbose >= 2:
             print('Predicting..... Please be patient!')
         try:
             while True:
@@ -59,7 +60,7 @@ class WhatIs:
                 del file, file_name
         except:
             pass
-        if self.verbose == 2:
+        if self.verbose >= 2:
             print('Prediction Complete!')
         return
 
@@ -90,7 +91,7 @@ class WhatIs:
                 raise RuntimeError(
                     'Model unavailable for block size of {} bytes and scenario {}.'.format(self.block_size,
                                                                                            self.scenario))
-        if self.verbose == 2:
+        if self.verbose >= 2:
             print('Loaded model: {}. \nSummary of model:'.format(self.model_name))
             model.summary()
         return model
@@ -100,25 +101,24 @@ class WhatIs:
         tic = time.perf_counter()
         pred_probability = model.predict_proba(blocks)
         toc = time.perf_counter()
-        if self.verbose == 2:
+        if self.verbose >= 2:
             print('Inference time per sample = {} ms'.format((toc - tic) * 1000 / len(blocks)))
         return pred_probability
 
     def plot_maps(self, df, file_name):
-        width = 8
+        cmap = plt.cm.coolwarm
         if self.scenario == 1:
-            cmap = plt.cm.viridis
             fig, axes = plt.subplots(nrows=2, ncols=1)
+
             # plotting class labels
             class_numbers = np.array(df['Class Number'])
+            width = int(np.sqrt(len(class_numbers)))
             class_numbers = np.concatenate((class_numbers, 75 * np.ones(width - len(class_numbers) % width))).reshape(
                 (-1, width))
             label_dict = dict([(label, i) for i, label in enumerate(self.labels)])
             label_dict['empty'] = len(label_dict)
-            cmap = plt.cm.get_cmap('cubehelix', len(label_dict))
-            axes[0].imshow(class_numbers, cmap=cmap, vmin=0, vmax=len(self.labels))
-            # patches = [mpatches.Patch(color=cmap(v), label=k) for k, v in sorted(label_dict.items(), key=lambda t: t[1])
-            #            if v in class_numbers]
+            rcParams['axes.prop_cycle'] = cycler(color=cmap(np.linspace(0, 1, len(label_dict))))
+            axes[0].imshow(class_numbers, cmap=cmap)
             # axes[0].legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
             axes[0].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
             axes[0].tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
@@ -133,27 +133,31 @@ class WhatIs:
             tags_enum = np.array(tags_enum)
             tags_enum = np.concatenate((
                 tags_enum, (len(tags_dict) - 1) * np.ones(width - len(tags_enum) % width))).reshape((-1, width))
-            cmap = plt.cm.get_cmap('cubehelix', len(tags_dict))
-            axes[1].imshow(tags_enum, cmap=cmap, vmin=0, vmax=len(tags_dict) - 1)
-            patches = [mpatches.Patch(color=cmap(v), label=k) for k, v in sorted(tags_dict.items(), key=lambda t: t[1])]
-            axes[1].legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
+            rcParams['axes.prop_cycle'] = cycler(color=cmap(np.linspace(0, 1, len(tags_dict))))
+            axes[1].imshow(tags_enum, cmap=cmap)
+            # axes[1].legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
             axes[1].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
             axes[1].tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
         else:
+            fig, axes = plt.subplots(1, 2, figsize=(12, 6))
             class_numbers = np.array(df['Class Number'])
             label_dict = dict([(label, i) for i, label in enumerate(self.labels)])
             label_dict['empty'] = len(label_dict)
+            width = int(np.sqrt(len(class_numbers)))
             class_numbers = np.concatenate(
                 (class_numbers, (len(label_dict) - 1) * np.ones(width - len(class_numbers) % width))).reshape((-1, width))
-            cmap = plt.cm.get_cmap('cubehelix', len(label_dict))
-            plt.imshow(class_numbers, cmap=cmap, vmin=0, vmax=len(self.labels))
-
-            patches = [mpatches.Patch(color=cmap(v), label=k) for k, v in sorted(label_dict.items(), key=lambda t: t[1])
-                       if v in class_numbers]
-            plt.legend(handles=patches, loc=2, bbox_to_anchor=(1.01, 1))
+            rcParams['axes.prop_cycle'] = cycler(color=cmap(np.linspace(0, 1, len(label_dict))))
+            axes[0].imshow(class_numbers, cmap=cmap)
+            norm = mpl.colors.BoundaryNorm(self.labels, len(label_dict))
+            cmap = mpl.colors.LinearSegmentedColormap.from_list('Custom cmap', cmaplist, cmap.N)
+            set_trace()
+            cb = mpl.colorbar.ColorbarBase(axes[1], cmap=cmap, norm=norm, ticks=list(label_dict.values()),
+                                           boundaries=list(label_dict.values()), format='%1i', drawedges=True)
+            # plt.colorbar()
+            # plt.legend()
             plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
             plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
-        plt.savefig(file_name)
+        plt.savefig(str(file_name))
         plt.cla()
         return
 
@@ -186,10 +190,10 @@ class WhatIs:
             if self.verbose >= 1 or self.block_wise:
                 if '.' in file_name:
                     file_name = '{}/{}'.format(self.output, file_name[:file_name.rfind('.')])
-                set_trace()
                 self.plot_maps(df, '{}.png'.format(file_name))
-            if self.verbose == 2:
+            if self.verbose >= 2:
                 df.to_csv('{}.csv'.format(file_name), sep=',', encoding='utf-8', index=False)
+                print("Written to {}.png.".format(file_name))
                 print("Written to {}.csv.".format(file_name))
         except:
             pass

@@ -27,11 +27,10 @@ def read_file(path, block_size):
 
 def read_files(input, block_size, recursive):
     """Reads the data disk or folder for inference"""
-    name_pattern = re.compile(r".*/(.+\..*)")
     if os.path.isfile(input):
         file_block = read_file(input, block_size)
         if file_block is not None:
-            yield file_block, input
+            yield file_block, os.path.split(input)[1]
     elif os.path.exists(input):
         if recursive:
             pattern = '**/*'
@@ -42,7 +41,7 @@ def read_files(input, block_size, recursive):
                 file_block = read_file(path, block_size)
                 if file_block is not None:
                     try:
-                        file_name = name_pattern.match(str(path)).group(1)
+                        file_name = os.path.split(path)[1]
                     except:
                         file_name = 'non-alphanumeric-name.xyz'
                     yield file_block, file_name
@@ -54,26 +53,21 @@ def make_output_folder(input, output, force):
     """Prepares output folder"""
     if not output:
         file_name = os.path.split(input)[1]
-        if os.path.isfile(input):
+        if os.path.isfile(input) or os.path.isdir(input):
             if file_name.rfind('.') != -1:
                 output = file_name[:file_name.rfind('.')]
             else:
                 output = 'fifty_{}'.format(file_name)
-        else:
-            match = re.match(r"(.*/)(.+)", input)
-            if match:
-                output = '{}fifty_{}'.format(match.group(1), match.group(2))
-            else:
-                output = './output'
 
     output = os.path.abspath(output)
     if os.path.exists(output):
         if force:
-            print("Warning! The output folder is being overwritten.")
+            print("Warning! The output folder - {} - is being overwritten.".format(output))
             shutil.rmtree(output)
         else:
-            raise BlockingIOError("The output folder already exists. Use -f to overwrite it completely.")
-    os.mkdir(output)
+            raise BlockingIOError(
+                "The output folder - {} - already exists. Use -f to overwrite it completely.".format(output))
+        os.mkdir(output)
     return output
 
 
