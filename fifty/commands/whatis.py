@@ -139,7 +139,7 @@ class WhatIs:
             axes[1].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
             axes[1].tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
         else:
-            fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+            fig, axes = plt.subplots(1, 2, figsize=(6, 12))
             class_numbers = np.array(df['Class Number'])
             label_dict = dict([(label, i) for i, label in enumerate(self.labels)])
             label_dict['empty'] = len(label_dict)
@@ -148,13 +148,13 @@ class WhatIs:
                 (class_numbers, (len(label_dict) - 1) * np.ones(width - len(class_numbers) % width))).reshape((-1, width))
             rcParams['axes.prop_cycle'] = cycler(color=cmap(np.linspace(0, 1, len(label_dict))))
             axes[0].imshow(class_numbers, cmap=cmap)
-            norm = mpl.colors.BoundaryNorm(self.labels, len(label_dict))
-            cmap = mpl.colors.LinearSegmentedColormap.from_list('Custom cmap', cmaplist, cmap.N)
-            set_trace()
-            cb = mpl.colorbar.ColorbarBase(axes[1], cmap=cmap, norm=norm, ticks=list(label_dict.values()),
-                                           boundaries=list(label_dict.values()), format='%1i', drawedges=True)
-            # plt.colorbar()
-            # plt.legend()
+            cmaplist = [cmap(int(i * 3.1)) for i in range(len(label_dict))]
+            cmaplist[len(label_dict) - 1] = [1.0, 1.0, 1.0, 1.0]
+            cmap = mpl.colors.LinearSegmentedColormap.from_list('Custom cmap', cmaplist, len(label_dict))
+            axes[0].imshow(class_numbers, cmap=cmap)
+            patches = [mpatches.Patch(color=cmap(v), label=k.upper()) for k, v in label_dict.items() if
+                       v in class_numbers]
+            axes[1].legend(handles=patches, ncol=len(patches) // 20 + 1)
             plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
             plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
         plt.savefig(str(file_name))
