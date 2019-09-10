@@ -67,7 +67,7 @@ def make_output_folder(input, output, force):
         else:
             raise BlockingIOError(
                 "The output folder - {} - already exists. Use -f to overwrite it completely.".format(output))
-        os.mkdir(output)
+    os.mkdir(output)
     return output
 
 

@@ -191,12 +191,13 @@ class WhatIs:
                 if '.' in file_name:
                     file_name = '{}/{}'.format(self.output, file_name[:file_name.rfind('.')])
                 self.plot_maps(df, '{}.png'.format(file_name))
+            if self.verbose >= 2:
+                print("Written to {}.png.".format(file_name))
         except:
             pass
         try:
             if self.verbose >= 2:
                 df.to_csv('{}.csv'.format(file_name), sep=',', encoding='utf-8', index=False)
-                print("Written to {}.png.".format(file_name))
                 print("Written to {}.csv.".format(file_name))
         except:
             pass
