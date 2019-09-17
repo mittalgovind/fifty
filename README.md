@@ -3,85 +3,31 @@
 
 FiFTy is a file type classifier that works much like the ``file`` command in Unix-like systems but with much more cool techniques up its sleeve. It beats several previous benchmarks on the biggest play field there is right now.  FiFTy comes with pre-trained models for six scenarios and for block sizes of 512 and 4096 bytes.  It is retrainable for a subset of our studied filetypes and can be scaled up for newer filetypes and other block sizes too. Please find our corresponding paper at https://arxiv.org/abs/1908.06148 and the ready-to-use open access datasets at [FFT-75](https://ieee-dataport.org/open-access/file-fragment-type-fft-75-dataset).
 
+## Installation
+```
+pip3 install fifty
+```
+
 ## List of Filetypes
 The classifier has been tested on the following 75 filetypes :--
-| Filetype | Tag | Description |
-| :----- | :-----: | :------------: |
-| ARW | Raw | Raw Sony camera images |
-| CR2 | Raw | Raw Canon camera images |
-| DNG | Raw | Raw Adobe camera images |
-| GPR | Raw | Raw GoPro camera images |
-| NEF | Raw | Raw Nikon camera images |
-| NRW | Raw | Raw Nikon camera images |
-| ORF | Raw | Raw Olympus camera images |
-| PEF | Raw | Raw Pentax camera images |
-| RAF | Raw | Raw Fuji camera images |
-| RW2 | Raw | Raw Panasonic camera images |
-| 3FR | Raw | Raw Hasselblad camera images |
-| JPG | Bitmap | Joint Photographers Experts Group (JPEG) |
-| TIFF | Bitmap | Tagged Image File Format |
-| HEIC | Bitmap | High Efficiency Image Format based on video frames |
-| BMP | Bitmap | Bitmap images |
-| GIF | Bitmap | Graphic Interchange Format |
-| PNG | Bitmap | Portable Network Graphics |
-| AI | Vector | Adobe Illustrator vector image |
-| EPS | Vector | Encapsulated PostScript vector |
-| PSD | Vector | Photoshop vector file |
-| MOV | Video | QuickTime File Format |
-| MP4 | Video | MPEG-4 Part 14 |
-| 3GP | Video | Multimedia container videos format |
-| AVI | Video | Audio Video Interleave container format |
-| MKV | Video | Matroska Multimedia Container |
-| OGV | Video | Ogg Vorbis video encoding format |
-| WEBM | Video | Web videos |
-| APK | Archive | Android application package |
-| JAR | Archive | Java class package (compiled) |
-| MSI | Archive | Windows Installer |
-| DMG | Archive | macOS application package |
-| 7Z | Archive | 7-zip archive |
-| BZ2 | Archive | Burrows Wheeler archive |
-| DEB | Archive | Linux/Unix application package |
-| GZ | Archive | GNU Gzip |
-| PKG | Archive | macOS compressed installer |
-| RAR | Archive | Roshal Archive by Microsoft |
-| RPM | Archive | RPM package manager (Red Hat) |
-| XZ | Archive | XZ (GNU LGPL/GPL) |
-| ZIP | Archive | ZIP archive |
-| EXE | Executables | Windows executable |
-| MACH-O | Executables | macOS executable |
-| ELF | Executables | Linux executable |
-| DLL | Executables | Dynamic Link Library (Windows Executable) |
-| DOC | Office | Microsoft Office (2007) Word  |
-| DOCX | Office | Microsoft Office (2013) Word  |
-| KEY | Office | macOS keynote presentation  | converted from .pptx files|
-| PPT | Office | Microsoft Office (2007) Powerpoint  |
-| PPTX | Office | Microsoft Office (2013) Powerpoint  |
-| XLS | Office | Microsoft Office (2007) Excel |
-| XLSX | Office | Microsoft Office (2013) Excel |
-| DJVU | Published | Digital Document Format by Yann LeCun |
-| EPUB | Published | Electronic Publication for iBooks |
-| MOBI | Published | Kindle E-book |
-| PDF | Published | Portable Document Format |
-| MD | Human-readable | Markdown |
-| RTF | Human-readable | Rich text format |
-| TXT | Human-readable | Text file |
-| TEX | Human-readable | LaTeX |
-| JSON | Human-readable | JavaScript Object Notation for database |
-| HTML | Human-readable | HyperText Markup Language |
-| XML | Human-readable | Extensible Markup Language |
-| LOG | Human-readable | Log files |
-| CSV | Human-readable | Comma-separated values |
-| AIFF | Audio | Audio Interchange File Format |
-| FLAC | Audio | Free Lossless Audio Codec |
-| M4A | Audio | Audio-only MPEG-4 |
-| MP3 | Audio | MPEG-1/2 Audio Layer III |
-| OGG | Audio | Audio container format developed by Xiph-Org |
-| WAV | Audio | Waveform Audio File format |
-| WMA | Audio | Windows Media Audio developed by Microsoft |
-| PCAP | Other | Wireshark captured network packets |
-| TTF | Other | True-type font |
-| DWG | Other | CAD drawing |
-| SQLITE | Other | SQL database |
+
+| | | | | | 
+| :---: | :---: | :---: | :---: | :---: |
+| ARW | CR2 | DNG | GPR | NEF |
+| NRW | ORF | PEF | RAF | RW2 |
+| 3FR | JPG | TIFF | HEIC | BMP |
+| GIF | PNG | AI | EPS | PSD |
+| MOV | MP4 | 3GP | AVI | MKV |
+| OGV | WEBM | APK | JAR | MSI |
+| DMG | 7Z | BZ2 | DEB | GZ |
+| PKG | RAR | RPM | XZ | ZIP |
+| EXE | MACH-O | ELF | DLL | DOC |
+| DOCX | KEY | PPT | PPTX | XLS |
+| XLSX | DJVU | EPUB | MOBI | PDF |
+| MD | RTF | TXT | TEX | JSON |
+| HTML | XML | LOG | CSV | AIFF |
+| FLAC | M4A | MP3 | OGG | WAV |
+| WMA | PCAP | TTF | DWG | SQLITE |
 
 
 ## Scenario Description
@@ -100,6 +46,23 @@ We present [models](https://github.com/mittalgovind/fifty/tree/master/fifty/util
 1. **\#6 (Camera-Specialized JPEG Carver; 2)**: JPEG is a separate class and the remaining photographic/video types (11 raw images, 3GP, MOV, MKV, TIFF and HEIC) are grouped into one _other_ class; scenario intended for analyzing SD cards from digital cameras.
 
 ## Training your own file classifier
+
+FiFTy is fully scalable. The file-types can be increased and decreased, depending upon a specific use-case. 
+
+### Scaling Down
+
+For scaling down, i.e., choosing a subset of file-types from the above table, you need to specify path to a text file containing each file-type on a new line and path to the FFT-75 dataset. This will sub-sample the specified samples from FFT-75 dataset and save it as a new dataset. You can use this dataset for further experiments. 
+
+### Scaling Up
+
+If you would like to test FiFTy on new filetypes, you would have to prepare your own dataset and specify it. If you are going to use some file-types that are already in the FFT-75 dataset, you might want to scale-down first and get the smaller dataset. Later you can augment that dataset according to your needs. 
+
+For preparing a dataset that is compatible with FiFTy, please follow these steps:
+
+1.  Download a lot of files of the new file-types.
+2.  Sample 102400 blocks from these files and create an ndarray (say, blocks) of shape: (102400, block-size) and labels (say, classes) of shape - (102400) of class_number you choose.
+3.  Concatenate all the blocks (as x) and classes (as y) of all file-types and shuffle using `random.shuffle`. 
+4.  Save the np.savez_compressed('new_dataset.npz', x=x, y=y).
 
 ## Output run on forensic images
 
