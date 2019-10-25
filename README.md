@@ -85,7 +85,7 @@ For scaling down, i.e., choosing a subset of file-types from the above table, yo
 
 A guideline for making this happen is as follows:
 
-- You need to download the (FFT-75 dataset)[https://ieee-dataport.org/open-access/file-fragment-type-fft-75-dataset].
+- You need to download the [FFT-75 dataset](https://ieee-dataport.org/open-access/file-fragment-type-fft-75-dataset]).
 
 - Do go through the documentation attached to that page.
 
@@ -95,7 +95,7 @@ A guideline for making this happen is as follows:
 
     `fifty train --data_dir /Users/<user_name>/Downloads/data --down scale_down.txt`
 
-Again, to make myself clear - the full path to the extracted folder from tar file should be saved inside a folder and that folder should be passed (eg, for the above case - /Users/<user_name>/Downloads/data/4k_1/train.npz)
+Again, to make myself clear - the full path to the extracted folder from tar file should be saved inside a folder and that folder should be passed (eg, for the above case - /Users/<user_name>/Downloads/data/4k_1/train.npz) with a text file containing file-types ([scale_down.txt](https://github.com/mittalgovind/fifty/blob/master/scale_down.txt))
 
 - Fifty should have created a dataset for it in the output directory. (If you don't see this, then training would fail.)
 
