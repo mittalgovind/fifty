@@ -53,6 +53,26 @@ FiFTy is fully scalable. The file-types can be increased and decreased, dependin
 
 For scaling down, i.e., choosing a subset of file-types from the above table, you need to specify path to a text file containing each file-type on a new line and path to the FFT-75 dataset. This will sub-sample the specified samples from FFT-75 dataset and save it as a new dataset. You can use this dataset for further experiments. 
 
+A guideline for making this happen is as follows:
+
+1> You need to download the (FFT-75 dataset)[https://ieee-dataport.org/open-access/file-fragment-type-fft-75-dataset].
+
+2> Do go through the documentation attached to that page.
+
+3> To sub-select filetypes only download the first (most generic) scenario. You can generate other scenarios training data (atleast a smaller version) using the first scenarios dataset.
+
+4> When you download the 4k_1.tar.gz or 512_1.tar.gz, extract it to a folder (say, data) and pass the path to this folder only. Example:
+
+    fifty train --data_dir /Users/<user_name>/Downloads/data --down scale_down.txt
+
+Again, to make myself clear - the full path to the extracted folder from tar file should be saved inside a folder and that folder should be passed (eg, for the above case - /Users/<user_name>/Downloads/data/4k_1/train.npz)
+
+5> Fifty should have created a dataset for it in the output directory. (If you don't see this, then training would fail.)
+
+6> The training will now start automatically on this dataset (please refer the training options to control this further) and save the best optimized model for your case in the output folder.
+
+7> Pass this model next time you run `fifty whatis` command on your test files.
+
 ### Scaling Up
 
 If you would like to test FiFTy on new filetypes, you would have to prepare your own dataset and specify it. If you are going to use some file-types that are already in the FFT-75 dataset, you might want to scale-down first and get the smaller dataset. Later you can augment that dataset according to your needs. 
@@ -63,6 +83,3 @@ For preparing a dataset that is compatible with FiFTy, please follow these steps
 2.  Sample 102400 blocks from these files and create an ndarray (say, blocks) of shape: (102400, block-size) and labels (say, classes) of shape - (102400) of class_number you choose.
 3.  Concatenate all the blocks (as x) and classes (as y) of all file-types and shuffle using `random.shuffle`. 
 4.  Save the np.savez_compressed('new_dataset.npz', x=x, y=y).
-
-## Output run on forensic images
-
