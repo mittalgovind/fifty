@@ -1,0 +1,6 @@
+heic
+png
+jpg
+md
+txt
+html
