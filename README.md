@@ -85,23 +85,23 @@ For scaling down, i.e., choosing a subset of file-types from the above table, yo
 
 A guideline for making this happen is as follows:
 
-1> You need to download the (FFT-75 dataset)[https://ieee-dataport.org/open-access/file-fragment-type-fft-75-dataset].
+- You need to download the (FFT-75 dataset)[https://ieee-dataport.org/open-access/file-fragment-type-fft-75-dataset].
 
-2> Do go through the documentation attached to that page.
+- Do go through the documentation attached to that page.
 
-3> To sub-select filetypes only download the first (most generic) scenario. You can generate other scenarios training data (atleast a smaller version) using the first scenarios dataset.
+- To sub-select filetypes only download the first (most generic) scenario. You can generate other scenarios training data (atleast a smaller version) using the first scenarios dataset.
 
-4> When you download the 4k_1.tar.gz or 512_1.tar.gz, extract it to a folder (say, data) and pass the path to this folder only. Example:
+- When you download the 4k_1.tar.gz or 512_1.tar.gz, extract it to a folder (say, data) and pass the path to this folder only. Example:
 
-    fifty train --data_dir /Users/<user_name>/Downloads/data --down scale_down.txt
+    `fifty train --data_dir /Users/<user_name>/Downloads/data --down scale_down.txt`
 
 Again, to make myself clear - the full path to the extracted folder from tar file should be saved inside a folder and that folder should be passed (eg, for the above case - /Users/<user_name>/Downloads/data/4k_1/train.npz)
 
-5> Fifty should have created a dataset for it in the output directory. (If you don't see this, then training would fail.)
+- Fifty should have created a dataset for it in the output directory. (If you don't see this, then training would fail.)
 
-6> The training will now start automatically on this dataset (please refer the training options to control this further) and save the best optimized model for your case in the output folder.
+- The training will now start automatically on this dataset (please refer the training options to control this further) and save the best optimized model for your case in the output folder.
 
-7> Pass this model next time you run `fifty whatis` command on your test files.
+- Pass this model next time you run `fifty whatis` command on your test files.
 
 ### Scaling Up
 
