@@ -109,7 +109,7 @@ If you would like to test FiFTy on new filetypes, you would have to prepare your
 
 For preparing a dataset that is compatible with FiFTy, please follow these steps:
 
-1.  Download a lot of files of the new file-types.
+1.  Download atleast 400 MB of files for each of the new file-type.
 2.  Sample 102400 blocks from these files and create an ndarray (say, blocks) of shape: (102400, block-size) and labels (say, classes) of shape - (102400) of class_number you choose.
 3.  Concatenate all the blocks (as x) and classes (as y) of all file-types and shuffle using `random.shuffle`. 
 4.  Save the np.savez_compressed('new_dataset.npz', x=x, y=y).
