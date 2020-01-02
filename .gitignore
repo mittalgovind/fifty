@@ -3,3 +3,10 @@
 /dist/
 /*.egg-info
 /*.egg
+
+.idea/
+
+fifty/data/
+
+/__pycache__/
+*.pyc
