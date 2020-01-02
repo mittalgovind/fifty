@@ -16,7 +16,7 @@ from keras.utils.np_utils import to_categorical
 from keras.utils import multi_gpu_model
 from hyperopt import partial, Trials, fmin, hp, tpe, rand
 
-from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
+from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
 
 
 class Train:
@@ -180,10 +180,6 @@ class Train:
         print(f'shapes:'
               f'\n  x_train_ :{x_train_.shape} y_train_ : {y_train_.shape}'
               f'\n  x_val_ :{x_val_.shape} y_val_: {y_val_.shape}')
-        # x_train_ : (81920, 512)
-        # y_train_ : (81920, 2)
-        # x_val_ : (10240, 512)
-        # y_val_: (10240, 2)
 
         try:
             model = Sequential()
@@ -200,8 +196,8 @@ class Train:
             model.add(Dense(self.no_of_classes, activation='softmax'))
             callbacks_list = [
                 callbacks.EarlyStopping(monitor='val_acc', patience=3, restore_best_weights=True, min_delta=0.01),
-                callbacks.ModelCheckpoint(os.path.join(self.output, '{}.h5'.format(self.new_model)), monitor='val_acc'),
-                callbacks.CSVLogger(filename=os.path.join(self.output, '{}.log'.format(self.new_model)), append=True)
+                callbacks.ModelCheckpoint(os.path.join(self.output, f'{self.model_name}.h5'), monitor='val_acc'),
+                callbacks.CSVLogger(filename=os.path.join(self.output, f'{self.model_name}.log'), append=True)
             ]
 
             # transform the model to a parallel one if multiple gpus are available.
@@ -228,7 +224,6 @@ class Train:
             print(e)
             accuracy = 0
             loss = np.inf
-            pass
 
         print("Loss: {}".format(loss))
         print("Accuracy: {:.2%}".format(accuracy))
