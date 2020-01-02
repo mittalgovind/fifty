@@ -39,15 +39,15 @@ from pdb import set_trace
 
 
 def main():
-    import argparse
     import fifty.commands as commands
     options = docopt(__doc__, version=VERSION)
 
     for k, v in options.items():
-        if hasattr(commands, k):
+        if hasattr(commands, k) and v is True:
             module = getattr(commands, k)
-            commands = getmembers(module, isclass)
-            command = [command[1] for command in commands if command[0] != 'Base'][0]
+            print(f'running command {k}: {module}')
+            commands_ = getmembers(module, isclass)
+            command = [command[1] for command in commands_ if command[0] in ['Train', 'WhatIs']][0]
             command = command(options)
             command.run()
 
