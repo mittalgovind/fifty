@@ -23,34 +23,48 @@ class Train:
 
     def __init__(self, options, *args):
         random.seed(random.randint(0, 1000))
-        self.input = os.path.abspath(options['<input>'])
+
+        self.input = options['<input>']
+        if self.input is None:
+            self.input = options['--data-dir']
+        self.input = os.path.abspath(self.input)
+
         if options['--model-name'] is not None:
             self.model_name = os.path.abspath(options['--model-name'])
         else:
             self.model_name = None
-        self.data_dir = options['--data-dir']
+
+        self.data_dir = os.path.abspath(options['--data-dir'])
         self.percent = float(options['--percent'])
-        self.block_size = options['--block_size']
-        self.gpu = int(options['--gpus'])
+        self.block_size = int(options['--block-size'])
+        self.gpus = int(options['--gpus'])
         self.output = options['--output']
         self.verbose = int(options['-v'])
         self.algo = options['--algo']
-        self.down = options['--down']
-        self.up = options['--up']
+        self.scale_down = options['--down']
+        self.scale_up = bool(options['--up'])
         self.max_evals = int(options['--max-evals'])
+        self.scenario = int(options['--scenario'])
+        self.force = bool(options['--force'])
+        self.recursive = bool(options['--recursive'])
         self.args = options
 
-        self.dataset = ()
+        self.new_model = None
+        self.dataset = (np.array([]), np.array([]), np.array([]), np.array([]))
         self.last_dense_layer = [75, 11, 25, 5, 2, 2]
-        self.no_of_classes = last_dense_layer[scenario - 1]
-        self.df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
+        self.no_of_classes = self.last_dense_layer[self.scenario - 1]
+        self.best_hparams = {}
+        self.df = pd.DataFrame(
+            columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy', ]).astype(
+            {'dense': int, 'embed_size': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
+             'accuracy': float, })
 
     def run(self):
         self.output = make_output_folder(self.input, self.output, self.force)
-        train()
+        self.train_model()
 
         if self.input is not None:
-            model = get_model()
+            model = self.get_model()
             from fifty.commands.whatis import WhatIs
             classifier = WhatIs(self.args)
             gen_files = read_files(self.input, self.block_size, self.recursive)
@@ -116,7 +130,7 @@ class Train:
                                 x=scale_down_x[split_train: split_val], y=scale_down_y[split_train: split_val])
             np.savez_compressed(os.path.join(out_data_dir, 'test.npz'),
                                 x=scale_down_x[split_val:], y=scale_down_y[split_val:])
-            load_dataset(self, out_data_dir)
+            self.load_dataset(out_data_dir)
 
     def load_dataset(self, data_dir=None):
         """Loads relevant already prepared FFT-75 dataset"""
@@ -142,14 +156,14 @@ class Train:
         self.dataset = x_train, one_hot_y_train, x_val, one_hot_y_val
 
     def get_best(self, ):
-        best_idx = df['accuracy'].idxmax()
+        best_idx = self.df['accuracy'].idxmax()
         best = dict()
-        best['dense'] = int(df['dense'].loc[best_idx])
-        best['embed_size'] = int(df['embed_size'].loc[best_idx])
-        best['filter'] = int(df['filter'].loc[best_idx])
-        best['kernel'] = int(df['kernel'].loc[best_idx])
-        best['layers'] = int(df['layers'].loc[best_idx])
-        best['pool'] = int(df['pool'].loc[best_idx])
+        best['dense'] = int(self.df['dense'].loc[best_idx])
+        best['embed_size'] = int(self.df['embed_size'].loc[best_idx])
+        best['filter'] = int(self.df['filter'].loc[best_idx])
+        best['kernel'] = int(self.df['kernel'].loc[best_idx])
+        best['layers'] = int(self.df['layers'].loc[best_idx])
+        best['pool'] = int(self.df['pool'].loc[best_idx])
         return best
 
     def train_network(self, parameters):
@@ -157,9 +171,23 @@ class Train:
         print(parameters)
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
 
+        # formatting data
+        x_train_ = x_train[:int(len(x_train) * self.percent)]
+        y_train_ = one_hot_y_train[:int(len(x_train) * self.percent)]
+        x_val_ = x_val[:int(len(x_val) * self.percent)]
+        y_val_ = one_hot_y_val[:int(len(x_val) * self.percent)]
+
+        print(f'shapes:'
+              f'\n  x_train_ :{x_train_.shape} y_train_ : {y_train_.shape}'
+              f'\n  x_val_ :{x_val_.shape} y_val_: {y_val_.shape}')
+        # x_train_ : (81920, 512)
+        # y_train_ : (81920, 2)
+        # x_val_ : (10240, 512)
+        # y_val_: (10240, 2)
+
         try:
             model = Sequential()
-            model.add(Embedding(256, parameters['embed_size'], input_length=block_size))
+            model.add(Embedding(256, parameters['embed_size'], input_length=self.block_size))
             for _ in range(parameters['layers']):
                 model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
                 model.add(LeakyReLU(alpha=0.3))
@@ -172,29 +200,35 @@ class Train:
             model.add(Dense(self.no_of_classes, activation='softmax'))
             callbacks_list = [
                 callbacks.EarlyStopping(monitor='val_acc', patience=3, restore_best_weights=True, min_delta=0.01),
-                callbacks.ModelCheckpoint(os.path.join(output, '{}.h5'.format(new_model)), monitor='val_acc'),
-                callbacks.CSVLogger(filename=os.path.join(output, '{}.log'.format(new_model)), append=True)
+                callbacks.ModelCheckpoint(os.path.join(self.output, '{}.h5'.format(self.new_model)), monitor='val_acc'),
+                callbacks.CSVLogger(filename=os.path.join(self.output, '{}.log'.format(self.new_model)), append=True)
             ]
 
             # transform the model to a parallel one if multiple gpus are available.
-            if gpu != 1:
-                model = multi_gpu_model(model, gpus=gpu)
+            if self.gpus != 1:
+                model = multi_gpu_model(model, gpus=self.gpus)
             model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
             model.summary()
+
             history = model.fit(
-                x=x_train[:int(len(x_train) * percent)],
-                y=one_hot_y_train[:int(len(x_train) * percent)],
-                epochs=1, batch_size=128, validation_data=(
-                    x_val[:int(len(x_val) * percent)], one_hot_y_val[:int(len(x_val) * percent)]),
-                verbose=verbose, callbacks=callbacks_list)
+                x=x_train_,
+                y=y_train_,
+                epochs=1,
+                batch_size=128,
+                validation_data=(x_val_, y_val_),
+                verbose=self.verbose,
+                callbacks=callbacks_list
+            )
             loss = min(history.history['val_loss'])
             accuracy = max(history.history['val_acc'])
             backend.clear_session()
             parameters['accuracy'] = accuracy
-            df.loc[len(df)] = list(parameters.values())
-        except:
+            self.df.loc[len(self.df)] = list(parameters.values())
+        except Exception as e:
+            print(e)
             accuracy = 0
             loss = np.inf
+            pass
 
         print("Loss: {}".format(loss))
         print("Accuracy: {:.2%}".format(accuracy))
@@ -202,38 +236,22 @@ class Train:
 
     def train_model(self):
         if self.data_dir:
-            load_dataset(self, self.data_dir)
+            self.load_dataset(self.data_dir)
         elif self.scale_down:
-            
-            make_new_dataset(self)
+            self.make_new_dataset()
         elif self.scale_up:
-            raise SystemExit(
-                'Please refer documentation. Requires you to prepare the dataset on your own and then use -d option.')
+            raise SystemExit('Please refer to the documentation.'
+                             'Requires you to prepare the dataset on your own and then use -d option.')
         else:
-            load_dataset(self)
-        # updating global variables. train_network only takes one and only one argument.
-        global percent, block_size, scenario, gpu, output, verbose, new_model, no_of_classes
-        percent = self.percent
-        block_size = self.block_size
-        scenario = self.scenario
-        gpu = self.gpus
-        output = self.output
-        new_model = self.new_model
-        if self.scale_down:
-            no_of_classes = len(list(open(self.scale_down, 'r')))
-        if self.v:
-            verbose = 0
-        elif self.vv:
-            verbose = 1
-        elif self.vvv:
-            verbose = 2
+            self.load_dataset()
+
         parameter_space = {
-            'layers': hp.choice('layers', [1, 2, 3]),
+            'layers':         hp.choice('layers', [1, 2, 3]),
             'embed_size': hp.choice('embed_size', [16, 32, 48, 64]),
-            'filter': hp.choice('filter', [16, 32, 64, 128]),
-            'kernel': hp.choice('kernel', [3, 11, 19, 27, 35]),
-            'pool': hp.choice('pool', [2, 4, 6, 8]),
-            'dense': hp.choice('dense', [16, 32, 64, 128, 256])
+            'filter':         hp.choice('filter', [16, 32, 64, 128]),
+            'kernel':         hp.choice('kernel', [3, 11, 19, 27, 35]),
+            'pool':             hp.choice('pool', [2, 4, 6, 8]),
+            'dense':           hp.choice('dense', [16, 32, 64, 128, 256])
         }
 
         trials = Trials()
@@ -258,17 +276,18 @@ class Train:
             )
 
         fmin(
-            train_network,
+            self.train_network,
             trials=trials,
             space=parameter_space,
             algo=algo,
             max_evals=self.max_evals,
             show_progressbar=False
         )
-        df.to_csv(os.path.join(self.output, 'parameters.csv'))
-        best = get_best()
+        self.df.to_csv(os.path.join(self.output, 'parameters.csv'))
+        self.best_hparams = self.get_best()
         print('\n-------------------------------------\n')
-        print('Hyper-parameter space exploration ended. \nRetraining the best again on the full dataset.')
-        percent = 1
-        train_network(best)
+        print('Hyper-parameter space exploration ended, best hyperparams:', self.best_hparams,
+              '\nRetraining the best again on the full dataset.')
+        self.percent = 1
+        self.train_network(self.best_hparams)
         print('The best model has been retrained and saved as {}.'.format(self.new_model))
