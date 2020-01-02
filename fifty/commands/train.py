@@ -49,7 +49,6 @@ class Train:
         self.recursive = bool(options['--recursive'])
         self.args = options
 
-        self.new_model = None
         self.dataset = (np.array([]), np.array([]), np.array([]), np.array([]))
         self.last_dense_layer = [75, 11, 25, 5, 2, 2]
         self.no_of_classes = self.last_dense_layer[self.scenario - 1]
@@ -285,4 +284,4 @@ class Train:
               '\nRetraining the best again on the full dataset.')
         self.percent = 1
         self.train_network(self.best_hparams)
-        print('The best model has been retrained and saved as {}.'.format(self.new_model))
+        print('The best model has been retrained and saved as {}.'.format(self.model_name))
