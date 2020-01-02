@@ -33,7 +33,7 @@ Options:
 import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from . import __version__ as VERSION
+from __init__ import __version__ as VERSION
 from inspect import getmembers, isclass
 from docopt import docopt
 from pdb import set_trace
@@ -52,3 +52,6 @@ def main():
             command = command(options)
             command.run()
 
+
+if __name__ == '__main__':
+    main()
