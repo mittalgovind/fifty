@@ -73,8 +73,8 @@ class Train:
                     pred_probability = classifier.infer(model, file)
                     classifier.output_predictions(pred_probability, file_name)
                     del file, file_name
-            except:
-                pass
+            except Exception as e:
+                print("WARNING: encountered error while predicting:", e)
         else:
             print('No input file given for inference on trained model.')
         return
@@ -87,11 +87,11 @@ class Train:
                 if os.path.isfile(self.model_name):
                     model = load_model(self.model_name)
                 else:
-                    raise FileNotFoundError('Could not find the specified model! {}'.format(self.model_name))
-            except RuntimeError:
-                raise RuntimeError('Could not load the specified model! {}'.format(self.model_name))
-            if self.verbose == 2:
-                print('Loaded model: {}. \nSummary of model:'.format(self.model_name))
+                    raise FileNotFoundError('Could not find the specified model! {}'.format(name_candidates))
+            except RuntimeError as re:
+                raise RuntimeError('Could not load the specified model! "{}"'.format(self.model_name), re)
+            if self.verbose >= 2:
+                print('Loaded model: "{}". \nSummary of model:'.format(self.model_name))
                 model.summary()
         return model
 
@@ -156,61 +156,39 @@ class Train:
 
     def get_best(self, ):
         best_idx = self.df['accuracy'].idxmax()
-        best = dict()
-        best['dense'] = int(self.df['dense'].loc[best_idx])
-        best['embed_size'] = int(self.df['embed_size'].loc[best_idx])
-        best['filter'] = int(self.df['filter'].loc[best_idx])
-        best['kernel'] = int(self.df['kernel'].loc[best_idx])
-        best['layers'] = int(self.df['layers'].loc[best_idx])
-        best['pool'] = int(self.df['pool'].loc[best_idx])
-        return best
+        return {
+            'dense': int(self.df['dense'].loc[best_idx]),
+            'embed_size': int(self.df['embed_size'].loc[best_idx]),
+            'filter': int(self.df['filter'].loc[best_idx]),
+            'kernel': int(self.df['kernel'].loc[best_idx]),
+            'layers': int(self.df['layers'].loc[best_idx]),
+            'pool': int(self.df['pool'].loc[best_idx]),
+        }
 
     def train_network(self, parameters):
-        print("\nParameters:")
-        print(parameters)
+        print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
-
         # formatting data
-        x_train_ = x_train[:int(len(x_train) * self.percent)]
-        y_train_ = one_hot_y_train[:int(len(x_train) * self.percent)]
-        x_val_ = x_val[:int(len(x_val) * self.percent)]
-        y_val_ = one_hot_y_val[:int(len(x_val) * self.percent)]
-
-        print(f'shapes:'
-              f'\n  x_train_ :{x_train_.shape} y_train_ : {y_train_.shape}'
-              f'\n  x_val_ :{x_val_.shape} y_val_: {y_val_.shape}')
+        x_train = x_train[:int(len(x_train) * self.percent)]
+        y_train = one_hot_y_train[:int(len(x_train) * self.percent)]
+        x_val = x_val[:int(len(x_val) * self.percent)]
+        y_val = one_hot_y_val[:int(len(x_val) * self.percent)]
 
         try:
-            model = Sequential()
-            model.add(Embedding(256, parameters['embed_size'], input_length=self.block_size))
-            for _ in range(parameters['layers']):
-                model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
-                model.add(LeakyReLU(alpha=0.3))
-                model.add(MaxPool1D(parameters['pool']))
+            model = self.build_model(parameters)
 
-            model.add(GlobalAveragePooling1D())
-            model.add(Dropout(0.1))
-            model.add(Dense(parameters['dense']))
-            model.add(LeakyReLU(alpha=0.3))
-            model.add(Dense(self.no_of_classes, activation='softmax'))
             callbacks_list = [
                 callbacks.EarlyStopping(monitor='val_acc', patience=3, restore_best_weights=True, min_delta=0.01),
                 callbacks.ModelCheckpoint(os.path.join(self.output, f'{self.model_name}.h5'), monitor='val_acc'),
                 callbacks.CSVLogger(filename=os.path.join(self.output, f'{self.model_name}.log'), append=True)
             ]
 
-            # transform the model to a parallel one if multiple gpus are available.
-            if self.gpus != 1:
-                model = multi_gpu_model(model, gpus=self.gpus)
-            model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
-            model.summary()
-
             history = model.fit(
-                x=x_train_,
-                y=y_train_,
+                x=x_train,
+                y=y_train,
                 epochs=1,
                 batch_size=128,
-                validation_data=(x_val_, y_val_),
+                validation_data=(x_val, y_val),
                 verbose=self.verbose,
                 callbacks=callbacks_list
             )
@@ -218,15 +196,23 @@ class Train:
             accuracy = max(history.history['val_acc'])
             backend.clear_session()
             parameters['accuracy'] = accuracy
-            self.df.loc[len(self.df)] = list(parameters.values())
+            self.df = self.df.append(list(parameters.values()))
         except Exception as e:
-            print(e)
+            print('!!ERROR:' + str(e))
             accuracy = 0
             loss = np.inf
 
         print("Loss: {}".format(loss))
         print("Accuracy: {:.2%}".format(accuracy))
         return loss
+
+    def build_model(self, parameters):
+        """
+        this is just a short-hand for calling build_model()
+        :param parameters: model parameters, see build_model()
+        :return: model
+        """
+        return build_model(parameters, no_of_classes=self.no_of_classes, input_length=self.block_size, gpus=self.gpus)
 
     def train_model(self):
         if self.data_dir:
@@ -284,4 +270,28 @@ class Train:
               '\nRetraining the best again on the full dataset.')
         self.percent = 1
         self.train_network(self.best_hparams)
-        print('The best model has been retrained and saved as {}.'.format(self.model_name))
+        print('The best model has been retrained and saved as "{}".'.format(self.model_name))
+
+
+def build_model(parameters, no_of_classes, input_length=None, gpus=1):
+    model = Sequential()
+    if parameters['embed_size'] is not None:
+        model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
+    else:  # else use autoencoder
+        model.add(Dense(256, activation='tanh'))
+    for _ in range(parameters['layers']):
+        model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
+        model.add(LeakyReLU(alpha=0.3))
+        model.add(MaxPool1D(parameters['pool']))
+    model.add(GlobalAveragePooling1D())
+    model.add(Dropout(0.1))
+    model.add(Dense(parameters['dense']))
+    model.add(LeakyReLU(alpha=0.3))
+    model.add(Dense(no_of_classes, activation='softmax'))
+    # transform the model to a parallel one if multiple gpus are available.
+    if gpus != 1:
+        model = multi_gpu_model(model, gpus=gpus)
+    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
+    model.summary()
+
+    return model
