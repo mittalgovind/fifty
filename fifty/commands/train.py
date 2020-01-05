@@ -169,10 +169,12 @@ class Train:
         print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
         # formatting data
-        x_train = x_train[:int(len(x_train) * self.percent)]
-        y_train = one_hot_y_train[:int(len(x_train) * self.percent)]
-        x_val = x_val[:int(len(x_val) * self.percent)]
-        y_val = one_hot_y_val[:int(len(x_val) * self.percent)]
+        x_train_ = x_train[:int(np.ceil(len(x_train) * self.percent))]
+        y_train_ = one_hot_y_train[:int(np.ceil(len(x_train) * self.percent))]
+        x_val_ = x_val[:int(np.ceil(len(x_val) * self.percent))]
+        y_val_ = one_hot_y_val[:int(np.ceil(len(x_val) * self.percent))]
+
+        print('x_train.shape, y_train.shape:' + str((x_train_.shape, y_train_.shape)))
 
         try:
             model = self.build_model(parameters)
@@ -184,11 +186,11 @@ class Train:
             ]
 
             history = model.fit(
-                x=x_train,
-                y=y_train,
+                x=x_train_,
+                y=y_train_,
                 epochs=1,
                 batch_size=128,
-                validation_data=(x_val, y_val),
+                validation_data=(x_val_, y_val_),
                 verbose=self.verbose,
                 callbacks=callbacks_list
             )
@@ -196,7 +198,7 @@ class Train:
             accuracy = max(history.history['val_acc'])
             backend.clear_session()
             parameters['accuracy'] = accuracy
-            self.df = self.df.append(list(parameters.values()))
+            self.df.loc[len(self.df)] = list(parameters.values())
         except Exception as e:
             print('!!ERROR:' + str(e))
             accuracy = 0
