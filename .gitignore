@@ -10,3 +10,6 @@ fifty/data/
 
 /__pycache__/
 *.pyc
+fifty/output/
+
+fifty/output.zip
