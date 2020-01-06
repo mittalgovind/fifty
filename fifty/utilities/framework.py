@@ -66,10 +66,12 @@ def make_output_folder(input, output, force=False):
         if force:
             print("Warning! The output folder - {} - is being overwritten.".format(output))
             shutil.rmtree(output)
-        else:
-            raise BlockingIOError(
-                "The output folder - {} - already exists. Use -f to overwrite it completely.".format(output))
-    os.mkdir(output)
+            os.mkdir(output)
+        else:  # load use the loaded hparams
+            print(
+                f'The output folder - "{output}" - already exists.'
+                f'Use [-f|--force] to overwrite it completely.')
+    os.makedirs(output, exist_ok=True)
     return output
 
 

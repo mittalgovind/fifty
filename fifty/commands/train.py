@@ -54,8 +54,18 @@ class Train:
         self.last_dense_layer = [75, 11, 25, 5, 2, 2]
         self.no_of_classes = self.last_dense_layer[self.scenario - 1]
         self.best_hparams = {}
-        self.df = pd.DataFrame(
-            columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy', ]).astype(
+
+        # setting up hparam scores dataframe
+        self.df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
+        params_path = os.path.join(self.output, 'parameters.csv')
+        # if options['--load-params'] and os.path.isfile(params_path):
+        try:
+            self.df = pd.read_csv(params_path).dropna(axis=0)
+            print(f"Found existing parameters in \"{params_path}\"")
+        except:
+            pass
+
+        self.df = self.df.astype(
             {'dense': int, 'embed_size': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
              'accuracy': float, })
 
@@ -85,8 +95,11 @@ class Train:
         model = None
         if self.model_name is not None:
             try:
-                if os.path.isfile(self.model_name):
+                name_candidates = [os.path.join(self.output, f'{self.model_name}.h5'), f'{self.model_name}.h5']
+                for model_name in filter(os.path.isfile, name_candidates):
+                    self.model_name = model_name
                     model = load_model(self.model_name)
+                    break
                 else:
                     raise FileNotFoundError('Could not find the specified model! {}'.format(name_candidates))
             except RuntimeError as re:
@@ -230,48 +243,54 @@ class Train:
         else:
             self.load_dataset()
 
-        parameter_space = {
-            'layers':         hp.choice('layers', [1, 2, 3]),
-            'embed_size': hp.choice('embed_size', [16, 32, 48, 64]),
-            'filter':         hp.choice('filter', [16, 32, 64, 128]),
-            'kernel':         hp.choice('kernel', [3, 11, 19, 27, 35]),
-            'pool':             hp.choice('pool', [2, 4, 6, 8]),
-            'dense':           hp.choice('dense', [16, 32, 64, 128, 256])
-        }
+        if len(self.df) == 0:  # if empty dataframe, perform hparam search, else hparams space already explored
+            print('Hparam space not explored, exploring hparam space...')
+            parameter_space = {
+                'layers': hp.choice('layers', [1, 2, 3]),
+                'embed_size': hp.choice('embed_size', [None, 16, 32, 48, 64]),
+                'filter': hp.choice('filter', [16, 32, 64, 128]),
+                'kernel': hp.choice('kernel', [3, 11, 19, 27, 35]),
+                'pool': hp.choice('pool', [2, 4, 6, 8]),
+                'dense': hp.choice('dense', [16, 32, 64, 128, 256])
+            }
 
-        trials = Trials()
+            trials = Trials()
 
-        if self.algo.lower() == 'tpe':
-            algo = partial(
-                tpe.suggest,
-                n_EI_candidates=1000,
-                gamma=0.2,
-                n_startup_jobs=int(0.1 * self.max_evals),
+            if self.algo.lower() == 'tpe':
+                algo = partial(
+                    tpe.suggest,
+                    n_EI_candidates=1000,
+                    gamma=0.2,
+                    n_startup_jobs=int(0.1 * self.max_evals),
+                )
+
+            elif self.algo.lower() == 'rand':
+                algo = rand.suggest
+            else:
+                print('Warning! The requested hyper-parameter algorithm is not supported. Using TPE.')
+                algo = partial(
+                    tpe.suggest,
+                    n_EI_candidates=1000,
+                    gamma=0.2,
+                    n_startup_jobs=int(0.1 * self.max_evals),
+                )
+
+            fmin(
+                self.train_network,
+                trials=trials,
+                space=parameter_space,
+                algo=algo,
+                max_evals=self.max_evals,
+                show_progressbar=False
             )
-
-        elif self.algo.lower() == 'rand':
-            algo = rand.suggest
+            self.df.to_csv(os.path.join(self.output, 'parameters.csv'))
+            print('\n-------------------------------------\n')
+            print('Hyper-parameter space exploration ended')
         else:
-            print('Warning! The requested hyper-parameter algorithm is not supported. Using TPE.')
-            algo = partial(
-                tpe.suggest,
-                n_EI_candidates=1000,
-                gamma=0.2,
-                n_startup_jobs=int(0.1 * self.max_evals),
-            )
+            print('Hparam space already explored, using existing "parameters.csv" file')
 
-        fmin(
-            self.train_network,
-            trials=trials,
-            space=parameter_space,
-            algo=algo,
-            max_evals=self.max_evals,
-            show_progressbar=False
-        )
-        self.df.to_csv(os.path.join(self.output, 'parameters.csv'))
         self.best_hparams = self.get_best()
-        print('\n-------------------------------------\n')
-        print('Hyper-parameter space exploration ended, best hyperparams:', self.best_hparams,
+        print('Best hyperparams:', self.best_hparams,
               '\nRetraining the best again on the full dataset.')
         self.percent = 1
         self.train_network(self.best_hparams)
