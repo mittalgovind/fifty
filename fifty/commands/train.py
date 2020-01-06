@@ -21,7 +21,6 @@ from fifty.utilities.framework import read_files, make_output_folder, load_label
 
 
 class Train:
-
     def __init__(self, options, *args):
         random.seed(random.randint(0, 1000))
 
@@ -29,6 +28,8 @@ class Train:
             else os.path.abspath(options['<input>'])
         options['--model-name'] = None if (options['--model-name'] is None) \
             else os.path.abspath(options['--model-name'])
+        options['--paramspace'] = None if (options['--paramspace'] is None) \
+            else os.path.abspath(options['--paramspace'])
 
         self.input = options['<input>']
         self.model_name = options['--model-name']
@@ -46,6 +47,7 @@ class Train:
         self.scenario = int(options['--scenario'])
         self.force = bool(options['--force'])
         self.recursive = bool(options['--recursive'])
+        self.paramspace = bool(options['--paramspace'])
         self.args = args
         self.options = options
 
@@ -222,7 +224,6 @@ class Train:
         print("Accuracy: {:.2%}".format(accuracy))
         return loss
 
-
     def build_model(self, parameters):
         """
         this is just a short-hand for calling build_model()
@@ -232,6 +233,7 @@ class Train:
         return build_model(parameters, no_of_classes=self.no_of_classes, input_length=self.block_size, gpus=self.gpus)
 
     def train_model(self):
+        """ explores the hyperparameter space and then trains the best model"""
         if self.data_dir:
             self.load_dataset(self.data_dir)
         elif self.scale_down:
@@ -242,49 +244,16 @@ class Train:
         else:
             self.load_dataset()
 
-        if len(self.df) == 0:  # if empty dataframe, perform hparam search, else hparams space already explored
-            print('Hparam space not explored, exploring hparam space...')
-            parameter_space = {
-                'layers': hp.choice('layers', [1, 2, 3]),
-                'embed_size': hp.choice('embed_size', [None, 16, 32, 48, 64]),
-                'filter': hp.choice('filter', [16, 32, 64, 128]),
-                'kernel': hp.choice('kernel', [3, 11, 19, 27, 35]),
-                'pool': hp.choice('pool', [2, 4, 6, 8]),
-                'dense': hp.choice('dense', [16, 32, 64, 128, 256])
-            }
-
-            trials = Trials()
-
-            if self.algo.lower() == 'tpe':
-                algo = partial(
-                    tpe.suggest,
-                    n_EI_candidates=1000,
-                    gamma=0.2,
-                    n_startup_jobs=int(0.1 * self.max_evals),
-                )
-
-            elif self.algo.lower() == 'rand':
-                algo = rand.suggest
-            else:
-                print('Warning! The requested hyper-parameter algorithm is not supported. Using TPE.')
-                algo = partial(
-                    tpe.suggest,
-                    n_EI_candidates=1000,
-                    gamma=0.2,
-                    n_startup_jobs=int(0.1 * self.max_evals),
-                )
-
-            fmin(
-                self.train_network,
-                trials=trials,
-                space=parameter_space,
-                algo=algo,
-                max_evals=self.max_evals,
-                show_progressbar=False
-            )
-            self.df.to_csv(os.path.join(self.output, 'parameters.csv'))
-            print('\n-------------------------------------\n')
-            print('Hyper-parameter space exploration ended')
+        # if empty dataframe, perform hparam search, else hparams space already explored
+        if len(self.df) == 0:
+            import json
+            try:
+                # loading paramspace json file
+                with open(self.paramspace, 'r', encoding='utf') as f:
+                    paramspace = json_paramspace2hyperopt_paramspace(json.load(f))
+            except:
+                raise FileNotFoundError(f'Paramspace file not found: "{self.paramspace}", this file must exist for hyperparameter exploration, please choose it using the "--paramspace" option')
+            self.explore_hparam_space(paramspace)
         else:
             print('Hparam space already explored, using existing "parameters.csv" file')
 
@@ -295,4 +264,40 @@ class Train:
         self.train_network(self.best_hparams)
         print('The best model has been retrained and saved as "{}".'.format(self.model_name))
 
+    def explore_hparam_space(self, parameter_space: dict):
+        """ explores hparam space according to the algorithm chosen and saves results in "output/parameters.csv" """
+        print('Hparam space not explored, exploring hparam space...')
+        trials = Trials()
+        if self.algo.lower() == 'tpe':
+            algo = partial(
+                tpe.suggest,
+                n_EI_candidates=1000,
+                gamma=0.2,
+                n_startup_jobs=int(0.1 * self.max_evals),
+            )
+        elif self.algo.lower() == 'rand':
+            algo = rand.suggest
+        else:
+            print('Warning! The requested hyper-parameter algorithm is not supported. Using TPE.')
+            algo = partial(
+                tpe.suggest,
+                n_EI_candidates=1000,
+                gamma=0.2,
+                n_startup_jobs=int(0.1 * self.max_evals),
+            )
 
+        fmin(
+            self.train_network,
+            trials=trials,
+            space=parameter_space,
+            algo=algo,
+            max_evals=self.max_evals,
+            show_progressbar=False
+        )
+        self.df.to_csv(os.path.join(self.output, 'parameters.csv'))
+        print('\n-------------------------------------\n')
+        print('Hyper-parameter space exploration ended')
+
+
+def json_paramspace2hyperopt_paramspace(d):
+    return {k: hp.choice(k, v) for k, v in d.items()}
