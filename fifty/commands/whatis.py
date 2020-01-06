@@ -4,6 +4,8 @@
 import os
 import re
 import json
+import sys
+
 import pandas as pd
 import numpy as np
 import time
@@ -44,8 +46,7 @@ class WhatIs:
 
     def run(self):
         if self.input is None:
-            parser.print_usage()
-            sys.exit(1)
+            raise Exception("Input not provided, please see usage")
 
         if self.verbose >= 1:
             self.output = make_output_folder(self.input, self.output, self.force)
@@ -60,8 +61,8 @@ class WhatIs:
                 pred_probability = self.infer(model, file)
                 self.output_predictions(pred_probability, file_name)
                 del file, file_name
-        except:
-            pass
+        except Exception as e:
+            print(e)
         if self.verbose >= 2:
             print('Prediction Complete!')
         return
