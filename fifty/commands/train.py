@@ -25,15 +25,13 @@ class Train:
     def __init__(self, options, *args):
         random.seed(random.randint(0, 1000))
 
-        self.input = options['<input>']
-        if self.input is None:
-            self.input = options['--data-dir']
-        self.input = os.path.abspath(self.input)
+        options['<input>'] = options['--data-dir'] if (options['<input>'] is None) \
+            else os.path.abspath(options['<input>'])
+        options['--model-name'] = None if (options['--model-name'] is None) \
+            else os.path.abspath(options['--model-name'])
 
-        if options['--model-name'] is not None:
-            self.model_name = os.path.abspath(options['--model-name'])
-        else:
-            self.model_name = None
+        self.input = options['<input>']
+        self.model_name = options['--model-name']
 
         self.data_dir = os.path.abspath(options['--data-dir'])
         self.percent = float(options['--percent'])
@@ -48,7 +46,8 @@ class Train:
         self.scenario = int(options['--scenario'])
         self.force = bool(options['--force'])
         self.recursive = bool(options['--recursive'])
-        self.args = options
+        self.args = args
+        self.options = options
 
         self.dataset = (np.array([]), np.array([]), np.array([]), np.array([]))
         self.last_dense_layer = [75, 11, 25, 5, 2, 2]
@@ -76,7 +75,7 @@ class Train:
         if self.input is not None:
             model = self.get_model()
             from fifty.commands.whatis import WhatIs
-            classifier = WhatIs(self.args)
+            classifier = WhatIs(self.options, *self.args)
             gen_files = read_files(self.input, self.block_size, self.recursive)
             try:
                 while True:

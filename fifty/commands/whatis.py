@@ -23,8 +23,12 @@ from pdb import set_trace
 
 class WhatIs:
     def __init__(self, options, *args):
-        self.input = os.path.abspath(options['<input>'])
-        self.file_name = options['<input>']
+        options['<input>'] = '.' if (options['<input>'] is None) \
+            else os.path.abspath(options['<input>'])
+        options['--model-name'] = None if (options['--model-name'] is None) \
+            else os.path.abspath(options['--model-name'])
+
+        self.input = options['<input>']
         self.recursive = options['--recursive']
         self.block_size = int(options['--block-size'])
         self.block_wise = options['--block-wise']
@@ -34,11 +38,9 @@ class WhatIs:
         self.light = options['--light']
         self.verbose = int(options['-v'])
         self.labels, self.tags = load_labels_tags(self.scenario)
-        if options['--model-name'] is not None:
-            self.model_name = os.path.abspath(options['--model-name'])
-        else:
-            self.model_name = None
+        self.model_name = options['--model-name']
         self.args = args
+        self.options = options
 
     def run(self):
         if self.input is None:
