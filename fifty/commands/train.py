@@ -6,14 +6,15 @@ import os
 import random
 import pandas as pd
 import tensorflow as tf
+
+from utilities.framework import build_model
+
 tf.logging.set_verbosity(tf.logging.ERROR)
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from keras.models import Sequential, load_model
-from keras.layers import Dense, Embedding, Dropout, MaxPool1D, GlobalAveragePooling1D, Conv1D, LeakyReLU
+from keras.models import load_model
 from keras import callbacks, backend
 from keras.utils.np_utils import to_categorical
-from keras.utils import multi_gpu_model
 from hyperopt import partial, Trials, fmin, hp, tpe, rand
 
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
@@ -90,6 +91,7 @@ class Train:
                     raise FileNotFoundError('Could not find the specified model! {}'.format(name_candidates))
             except RuntimeError as re:
                 raise RuntimeError('Could not load the specified model! "{}"'.format(self.model_name), re)
+
             if self.verbose >= 2:
                 print('Loaded model: "{}". \nSummary of model:'.format(self.model_name))
                 model.summary()
@@ -208,6 +210,7 @@ class Train:
         print("Accuracy: {:.2%}".format(accuracy))
         return loss
 
+
     def build_model(self, parameters):
         """
         this is just a short-hand for calling build_model()
@@ -275,25 +278,3 @@ class Train:
         print('The best model has been retrained and saved as "{}".'.format(self.model_name))
 
 
-def build_model(parameters, no_of_classes, input_length=None, gpus=1):
-    model = Sequential()
-    if parameters['embed_size'] is not None:
-        model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
-    else:  # else use autoencoder
-        model.add(Dense(256, activation='tanh'))
-    for _ in range(parameters['layers']):
-        model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
-        model.add(LeakyReLU(alpha=0.3))
-        model.add(MaxPool1D(parameters['pool']))
-    model.add(GlobalAveragePooling1D())
-    model.add(Dropout(0.1))
-    model.add(Dense(parameters['dense']))
-    model.add(LeakyReLU(alpha=0.3))
-    model.add(Dense(no_of_classes, activation='softmax'))
-    # transform the model to a parallel one if multiple gpus are available.
-    if gpus != 1:
-        model = multi_gpu_model(model, gpus=gpus)
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
-    model.summary()
-
-    return model

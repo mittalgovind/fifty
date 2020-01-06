@@ -8,6 +8,10 @@ import shutil
 from pathlib import Path
 from pdb import set_trace
 
+from keras import Sequential
+from keras.layers import Embedding, Dense, Conv1D, LeakyReLU, MaxPool1D, GlobalAveragePooling1D, Dropout
+from keras.utils import multi_gpu_model
+
 
 def get_utilities_dir():
     return os.path.dirname(__file__)
@@ -32,11 +36,9 @@ def read_files(input, block_size, recursive):
         if file_block is not None:
             yield file_block, os.path.split(input)[1]
     elif os.path.exists(input):
-        if recursive:
-            pattern = '**/*'
-        else:
-            pattern = './*'
+        pattern = '**/*' if recursive else './*'
         for path in Path(input).glob(pattern):
+            path = path.as_posix()
             if os.path.isfile(path):
                 file_block = read_file(path, block_size)
                 if file_block is not None:
@@ -49,7 +51,7 @@ def read_files(input, block_size, recursive):
         raise FileNotFoundError('Could not find {}'.format(input))
 
 
-def make_output_folder(input, output, force):
+def make_output_folder(input, output, force=False):
     """Prepares output folder"""
     if not output:
         file_name = os.path.split(input)[1]
@@ -82,3 +84,27 @@ def load_labels_tags(scenario):
         raise FileNotFoundError('Please download labels.json to {} directory!'.format(get_utilities_dir()))
     return labels, tags
 
+
+def build_model(parameters, no_of_classes, input_length=None, gpus=1):
+    model = Sequential()
+    if parameters['embed_size'] is not None:
+        model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
+    else:  # else use autoencoder
+        model.add(Dense(256, activation='tanh'))
+    for _ in range(parameters['layers']):
+        model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
+        model.add(LeakyReLU(alpha=0.3))
+        model.add(MaxPool1D(parameters['pool']))
+    model.add(GlobalAveragePooling1D())
+    model.add(Dropout(0.1))
+    model.add(Dense(parameters['dense']))
+    model.add(LeakyReLU(alpha=0.3))
+    model.add(Dense(no_of_classes, activation='softmax'))
+    # transform the model to a parallel one if multiple gpus are available.
+    if gpus != 1:
+        model = multi_gpu_model(model, gpus=gpus)
+    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
+    model.build()
+    model.summary()
+
+    return model
