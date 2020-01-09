@@ -3,7 +3,7 @@ FiFTy: File-Fragment Type Classifier using Neural Networks
 
 Usage:
   fifty whatis <input> [-r] [-b BLOCK_SIZE] [-s SCENARIO] [-o OUTPUT] [--block-wise]  [-f] [-l] [-v] [-vv] [-vvv] [-m MODEL_NAME]
-  fifty train [-d DATA_DIR] [-b BLOCK_SIZE] [-s SCENARIO] [-o OUTPUT] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [-f] [--down SCALE_DOWN] [--up] [--paramspace PARAMSPACE_JSON] [-v] [-vv] [-vvv] [-m MODEL_NAME]
+  fifty train [-d DATA_DIR] [-b BLOCK_SIZE] [-s SCENARIO] [-o OUTPUT] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [-f] [--down SCALE_DOWN] [--up] [--paramspace PARAMSPACE_JSON] [--epochs EPOCHS] [-v] [-vv] [-vvv] [-m MODEL_NAME]
   fifty -h | --help
   fifty --version
 
@@ -25,6 +25,7 @@ Options:
   -g GPUS, --gpus GPUS                      Number of GPUs to use for training (if any). [default: 1]
   -p PERCENT, --percent PERCENT             Percentage of training data to use. [default: 0.1]
   -n MAX_EVALS, --max-evals MAX_EVALS       Number of networks to evaluate. [default: 225]
+  --epochs EPOCHS                           Number of epochs to train the final network [default: 10].
   --down SCALE_DOWN                         Path to file with specific filetypes (from our list of 75 filetypes). See utilities/scale_down.txt for reference [default: ../scale_down.txt].
   --up                                      Train with newer filetypes. Please refer documentation. [default: False]
   --paramspace PARAMSPACE_JSON              Path to JSON file with model hyperparameter choices [default: ./parameter_space.json].

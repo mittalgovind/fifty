@@ -16,6 +16,7 @@ from keras.utils.np_utils import to_categorical
 
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
 from utilities.framework import build_model
+from utilities.utils import json_paramspace2hyperopt_paramspace, dict_to_safe_filename
 
 tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -51,6 +52,7 @@ class Train:
         self.force = bool(options['--force'])
         self.recursive = bool(options['--recursive'])
         self.paramspace = options['--paramspace']
+        self.epochs = int(options['--epochs'])
         self.args = args
         self.options = options
 
@@ -183,7 +185,7 @@ class Train:
             'pool': int(self.df['pool'].loc[best_idx]),
         }
 
-    def train_network(self, parameters):
+    def train_network(self, parameters, epochs=1, load=False):
         print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
         # formatting data
@@ -194,19 +196,33 @@ class Train:
 
         print('x_train.shape, y_train.shape: {0}'.format((x_train_.shape, y_train_.shape)))
 
+        # load existing model if exists
+        model_dir = self.model_dir(None, params=parameters)
+        os.makedirs(model_dir, exist_ok=True)
+
         try:
-            model = self.build_model(parameters)
+            if load:
+                model = load_model(self.model_dir('.h5', params=parameters))
+            else:
+                # default: build new model
+                model = self.build_model(parameters)
+
+            print(f"Model in:\"{self.model_dir('.h5', params=parameters)}\"")
 
             callbacks_list = [
-                callbacks.EarlyStopping(monitor='val_acc', patience=3, restore_best_weights=True, min_delta=0.01),
-                callbacks.ModelCheckpoint(os.path.join(self.output, f'{self.model_name}.h5'), monitor='val_acc'),
-                callbacks.CSVLogger(filename=os.path.join(self.output, f'{self.model_name}.log'), append=True)
+                callbacks.EarlyStopping(monitor='val_acc', patience=5, restore_best_weights=True, min_delta=0.01),
+                # saving model with exact name
+                callbacks.ModelCheckpoint(self.model_dir('.h5'), monitor='val_acc'),
+                callbacks.CSVLogger(filename=(self.model_dir('.log')), append=True),
+                # saving model hparam_str in name
+                callbacks.ModelCheckpoint(self.model_dir('.h5', params=parameters), monitor='val_acc'),
+                callbacks.CSVLogger(filename=(self.model_dir('.log', params=parameters)), append=True),
             ]
 
             history = model.fit(
                 x=x_train_,
                 y=y_train_,
-                epochs=1,
+                epochs=epochs,
                 batch_size=128,
                 validation_data=(x_val_, y_val_),
                 verbose=self.verbose,
@@ -263,8 +279,8 @@ class Train:
         print('Best hyperparams:', self.best_hparams,
               '\nRetraining the best again on the full dataset.')
         self.percent = 1
-        self.train_network(self.best_hparams)
-        print('The best model has been retrained and saved as "{}".'.format(self.model_name))
+        self.train_network(self.best_hparams, epochs=self.epochs, load=True)
+        print('The best model has been retrained and saved as "{}.h5"'.format(self.model_name))
 
     def explore_hparam_space(self, parameter_space: dict):
         """ explores hparam space according to the algorithm chosen and saves results in "output/parameters.csv" """
@@ -300,5 +316,19 @@ class Train:
         print('\n-------------------------------------\n')
         print('Hyper-parameter space exploration ended')
 
+    def model_dir(self, ext=None, params=None):
+        """
+        :param params: dict
+        :param ext: model extension (includes '.'). if None, will return a folder path only, not filename appended
+        :return:
+        """
+        path = self.output
 
-def json_paramspace2hyperopt_paramspace(d):
+        # append_params
+        if params is not None:
+            path = os.path.join(path, f'{self.model_name}_{dict_to_safe_filename(params)}')
+
+        if ext is not None:
+            path = os.path.join(path, f'{self.model_name}{ext}')
+
+        return path

@@ -109,6 +109,7 @@ def build_model(parameters, no_of_classes, input_length=None, gpus=1):
         model = multi_gpu_model(model, gpus=gpus)
     model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
     model.build()
+    model.build(input_shape=(input_length,))
     model.summary()
 
     return model
