@@ -1,23 +1,26 @@
 # fifty/commands/train.py
 
-# from .base import Base
-import numpy as np
+import datetime
+import json
 import os
 import random
+
+import keras
+import numpy as np
 import pandas as pd
 import tensorflow as tf
+from hyperopt import partial, Trials, fmin, tpe, rand
+from keras import callbacks, backend
+from keras.models import load_model
+from keras.utils.np_utils import to_categorical
 
+from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
 from utilities.framework import build_model
 
 tf.logging.set_verbosity(tf.logging.ERROR)
+
+
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-from keras.models import load_model
-from keras import callbacks, backend
-from keras.utils.np_utils import to_categorical
-from hyperopt import partial, Trials, fmin, hp, tpe, rand
-
-from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
 
 
 class Train:
@@ -47,7 +50,7 @@ class Train:
         self.scenario = int(options['--scenario'])
         self.force = bool(options['--force'])
         self.recursive = bool(options['--recursive'])
-        self.paramspace = bool(options['--paramspace'])
+        self.paramspace = options['--paramspace']
         self.args = args
         self.options = options
 
@@ -59,12 +62,12 @@ class Train:
         # setting up hparam scores dataframe
         self.df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
         params_path = os.path.join(self.output, 'parameters.csv')
-        # if options['--load-params'] and os.path.isfile(params_path):
-        try:
-            self.df = pd.read_csv(params_path).dropna(axis=0)
-            print(f"Found existing parameters in \"{params_path}\"")
-        except:
-            pass
+        if not self.force and os.path.isfile(params_path):
+            try:
+                self.df = pd.read_csv(params_path).dropna(axis=0)
+                print(f"Found existing parameters in \"{params_path}\"")
+            except Exception as e:
+                print("Couldn\'t read previous parameters: {0}".format(str(e)))
 
         self.df = self.df.astype(
             {'dense': int, 'embed_size': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
@@ -74,35 +77,34 @@ class Train:
         self.output = make_output_folder(self.input, self.output, self.force)
         self.train_model()
 
-        if self.input is not None:
-            model = self.get_model()
-            from fifty.commands.whatis import WhatIs
-            classifier = WhatIs(self.options, *self.args)
-            gen_files = read_files(self.input, self.block_size, self.recursive)
-            try:
-                while True:
-                    file, file_name = next(gen_files)
-                    pred_probability = classifier.infer(model, file)
-                    classifier.output_predictions(pred_probability, file_name)
-                    del file, file_name
-            except Exception as e:
-                print("WARNING: encountered error while predicting:", e)
-        else:
-            print('No input file given for inference on trained model.')
-        return
+        if self.input is None:
+            raise Exception('No input file given for inference on trained model.')
+
+        model = self.get_model()
+        from fifty.commands.whatis import WhatIs
+        classifier = WhatIs(self.options, *self.args)
+        gen_files = read_files(self.input, self.block_size, self.recursive)
+        try:
+            while True:
+                file, file_name = next(gen_files)
+                pred_probability = classifier.infer(model, file)
+                classifier.output_predictions(pred_probability, file_name)
+                del file, file_name
+        except Exception as e:
+            print("!Error encountered while predicting: " + str(e))
+            import traceback
+            traceback.print_exc()
 
     def get_model(self):
         """Finds and returns a relevant pre-trained model"""
         model = None
         if self.model_name is not None:
             try:
-                name_candidates = [os.path.join(self.output, f'{self.model_name}.h5'), f'{self.model_name}.h5']
-                for model_name in filter(os.path.isfile, name_candidates):
-                    self.model_name = model_name
-                    model = load_model(self.model_name)
-                    break
+                model_path = self.model_dir(ext='.h5')
+                if os.path.isfile(model_path):
+                    model = load_model(model_path)
                 else:
-                    raise FileNotFoundError('Could not find the specified model! {}'.format(name_candidates))
+                    raise FileNotFoundError('Could not find the specified model! "{}"'.format(model_path))
             except RuntimeError as re:
                 raise RuntimeError('Could not load the specified model! "{}"'.format(self.model_name), re)
 
@@ -190,7 +192,7 @@ class Train:
         x_val_ = x_val[:int(np.ceil(len(x_val) * self.percent))]
         y_val_ = one_hot_y_val[:int(np.ceil(len(x_val) * self.percent))]
 
-        print('x_train.shape, y_train.shape:' + str((x_train_.shape, y_train_.shape)))
+        print('x_train.shape, y_train.shape: {0}'.format((x_train_.shape, y_train_.shape)))
 
         try:
             model = self.build_model(parameters)
@@ -214,9 +216,9 @@ class Train:
             accuracy = max(history.history['val_acc'])
             backend.clear_session()
             parameters['accuracy'] = accuracy
-            self.df.loc[len(self.df)] = list(parameters.values())
-        except Exception as e:
-            print('!!ERROR:' + str(e))
+            self.df.loc[len(self.df)] = parameters
+        except ValueError as ve:
+            print('!!ERROR: {0}'.format(ve))
             accuracy = 0
             loss = np.inf
 
@@ -245,14 +247,14 @@ class Train:
             self.load_dataset()
 
         # if empty dataframe, perform hparam search, else hparams space already explored
-        if len(self.df) == 0:
-            import json
+        if len(self.df) == 0 or self.force:
             try:
                 # loading paramspace json file
                 with open(self.paramspace, 'r', encoding='utf') as f:
                     paramspace = json_paramspace2hyperopt_paramspace(json.load(f))
-            except:
-                raise FileNotFoundError(f'Paramspace file not found: "{self.paramspace}", this file must exist for hyperparameter exploration, please choose it using the "--paramspace" option')
+            except FileNotFoundError as fnfe:
+                print(f'Paramspace file not found: "{self.paramspace}", this file must exist for hyperparameter exploration, please choose it using the "--paramspace" option', fnfe)
+                raise fnfe
             self.explore_hparam_space(paramspace)
         else:
             print('Hparam space already explored, using existing "parameters.csv" file')
@@ -294,10 +296,9 @@ class Train:
             max_evals=self.max_evals,
             show_progressbar=False
         )
-        self.df.to_csv(os.path.join(self.output, 'parameters.csv'))
+        self.df.to_csv(os.path.join(self.output, 'parameters.csv'), index=False)
         print('\n-------------------------------------\n')
         print('Hyper-parameter space exploration ended')
 
 
 def json_paramspace2hyperopt_paramspace(d):
-    return {k: hp.choice(k, v) for k, v in d.items()}

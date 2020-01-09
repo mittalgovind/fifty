@@ -65,8 +65,10 @@ def make_output_folder(input, output, force=False):
     if os.path.exists(output):
         if force:
             print("Warning! The output folder - {} - is being overwritten.".format(output))
-            shutil.rmtree(output)
-            os.mkdir(output)
+            try:
+                shutil.rmtree(output)
+            except:
+                pass
         else:  # load use the loaded hparams
             print(
                 f'The output folder - "{output}" - already exists.'
