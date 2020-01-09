@@ -188,7 +188,14 @@ class Train:
     def train_network(self, parameters, epochs=1, load=False):
         print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
-        # formatting data
+        # == formatting data ==
+        # shuffle
+        np.random.seed(99); np.random.shuffle(x_train)
+        np.random.seed(99); np.random.shuffle(one_hot_y_train)
+        np.random.seed(99); np.random.shuffle(x_val)
+        np.random.seed(99); np.random.shuffle(one_hot_y_val)
+        np.random.sample()
+        # trim
         x_train_ = x_train[:int(np.ceil(len(x_train) * self.percent))]
         y_train_ = one_hot_y_train[:int(np.ceil(len(x_train) * self.percent))]
         x_val_ = x_val[:int(np.ceil(len(x_val) * self.percent))]
@@ -278,7 +285,7 @@ class Train:
         self.best_hparams = self.get_best()
         print('Best hyperparams:', self.best_hparams,
               '\nRetraining the best again on the full dataset.')
-        self.percent = 1
+        self.percent = 1.0
         self.train_network(self.best_hparams, epochs=self.epochs, load=True)
         print('The best model has been retrained and saved as "{}.h5"'.format(self.model_name))
 

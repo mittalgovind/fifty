@@ -168,7 +168,7 @@ class WhatIs:
         """Saves prediction in relevant format to disk"""
         pred_class = np.argmax(pred_probability, axis=1)
         pred_label = [self.labels[i] for i in pred_class]
-        pred_probability = np.round(np.max(pred_probability, axis=1) * 100, decimals=1)
+        pred_probability = np.round(np.max(pred_probability, axis=1) * 100.0, decimals=1)
         tags = [self.tags[i] for i in pred_class]
         df = pd.DataFrame(
             {
