@@ -216,6 +216,8 @@ class Train:
 
             print(f"Model in:\"{self.model_dir('.h5', params=parameters)}\"")
 
+            # tensorboard log directory
+            log_dir = os.path.join(model_dir, 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
             callbacks_list = [
                 callbacks.EarlyStopping(monitor='val_acc', patience=5, restore_best_weights=True, min_delta=0.01),
                 # saving model with exact name
@@ -225,6 +227,9 @@ class Train:
                 callbacks.ModelCheckpoint(self.model_dir('.h5', params=parameters), monitor='val_acc'),
                 callbacks.CSVLogger(filename=(self.model_dir('.log', params=parameters)), append=True),
             ]
+            if epochs > 1:
+                # tensorboard callback
+                callbacks_list.append(keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, embeddings_freq=0))
 
             history = model.fit(
                 x=x_train_,
