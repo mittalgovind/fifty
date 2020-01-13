@@ -1,17 +1,18 @@
 # fifty/commands/train.py
 
-import datetime
 import json
 import os
 import random
+import time
 
 import keras
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from hyperopt import partial, Trials, fmin, tpe, rand
-from keras import callbacks, backend
-from keras.models import load_model
+
+import keras as keras
+from keras import callbacks, backend, models
 from keras.utils.np_utils import to_categorical
 
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
@@ -104,7 +105,7 @@ class Train:
             try:
                 model_path = self.model_dir(ext='.h5')
                 if os.path.isfile(model_path):
-                    model = load_model(model_path)
+                    model = models.load_model(model_path)
                 else:
                     raise FileNotFoundError('Could not find the specified model! "{}"'.format(model_path))
             except RuntimeError as re:
@@ -186,6 +187,8 @@ class Train:
         }
 
     def train_network(self, parameters, epochs=1, load=False):
+        batch_size = 128
+
         print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
         # == formatting data ==
@@ -194,30 +197,46 @@ class Train:
         np.random.seed(99); np.random.shuffle(one_hot_y_train)
         np.random.seed(99); np.random.shuffle(x_val)
         np.random.seed(99); np.random.shuffle(one_hot_y_val)
-        np.random.sample()
         # trim
         x_train_ = x_train[:int(np.ceil(len(x_train) * self.percent))]
         y_train_ = one_hot_y_train[:int(np.ceil(len(x_train) * self.percent))]
         x_val_ = x_val[:int(np.ceil(len(x_val) * self.percent))]
         y_val_ = one_hot_y_val[:int(np.ceil(len(x_val) * self.percent))]
 
-        print('x_train.shape, y_train.shape: {0}'.format((x_train_.shape, y_train_.shape)))
+        # TODO: FIXME: fix this someday, it works but .fit() throws an exception: "AttributeError: 'DatasetV1Adapter' object has no attribute 'ndim'"
+        # train_dataset = tf.data.Dataset.from_tensor_slices((x_train, one_hot_y_train)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        # val_dataset = tf.data.Dataset.from_tensor_slices((x_val, one_hot_y_val)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
 
         # load existing model if exists
         model_dir = self.model_dir(None, params=parameters)
-        os.makedirs(model_dir, exist_ok=True)
+
+        initial_epoch = 0
+        log_dir = os.path.join(model_dir, 'fit')
 
         try:
-            if load:
-                model = load_model(self.model_dir('.h5', params=parameters))
-            else:
-                # default: build new model
-                model = self.build_model(parameters)
+            if load:  # load old model
+                print('loading old model...', end='')
+                start_time = time.time()
 
-            print(f"Model in:\"{self.model_dir('.h5', params=parameters)}\"")
+                model = models.load_model(self.model_dir('.h5', params=parameters))
+
+                print('old model loaded in {:.3f}s, loading latest TFEvent summary...'.format(time.time() - start_time), end='')
+                start_time = time.time()
+
+                print('model successfully loaded in {:.3f}s'.format(time.time() - start_time))
+            else:  # default: build new model
+                # manually defining optimizer and loss
+                optim = keras.optimizers.rmsprop(lr=0.0005, rho=0.9)
+                loss_func = keras.losses.categorical_crossentropy
+
+                model = build_model(parameters, no_of_classes=self.no_of_classes, input_length=self.block_size,
+                                    gpus=self.gpus, optim=optim, loss=loss_func)
+                model.summary()
+
+            print(f"Model in: \"{self.model_dir('.h5', params=parameters)}\"")
 
             callbacks_list = [
-                callbacks.EarlyStopping(monitor='val_acc', patience=5, restore_best_weights=True, min_delta=0.01),
+                callbacks.EarlyStopping(monitor='val_acc', patience=5, restore_best_weights=True, min_delta=0.03),
                 # saving model with exact name
                 callbacks.ModelCheckpoint(self.model_dir('.h5'), monitor='val_acc'),
                 callbacks.CSVLogger(filename=(self.model_dir('.log')), append=True),
@@ -227,17 +246,18 @@ class Train:
             ]
             if epochs > 1:
                 # tensorboard logging
-                log_dir = os.path.join(model_dir, 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
                 callbacks_list.append(keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, embeddings_freq=0))
 
+            os.makedirs(model_dir, exist_ok=True)
             history = model.fit(
                 x=x_train_,
                 y=y_train_,
                 epochs=epochs,
-                batch_size=128,
+                batch_size=batch_size,
                 validation_data=(x_val_, y_val_),
                 verbose=self.verbose,
-                callbacks=callbacks_list
+                callbacks=callbacks_list,
+                initial_epoch=initial_epoch,
             )
             loss = min(history.history['val_loss'])
             accuracy = max(history.history['val_acc'])
@@ -252,14 +272,6 @@ class Train:
         print("Loss: {}".format(loss))
         print("Accuracy: {:.2%}".format(accuracy))
         return loss
-
-    def build_model(self, parameters):
-        """
-        this is just a short-hand for calling build_model()
-        :param parameters: model parameters, see build_model()
-        :return: model
-        """
-        return build_model(parameters, no_of_classes=self.no_of_classes, input_length=self.block_size, gpus=self.gpus)
 
     def train_model(self):
         """ explores the hyperparameter space and then trains the best model"""

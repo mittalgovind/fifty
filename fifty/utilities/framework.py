@@ -89,8 +89,10 @@ def load_labels_tags(scenario):
     return labels, tags
 
 
-def build_model(parameters, no_of_classes, input_length=None, gpus=1):
-    model = Sequential()
+def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop',
+                loss=keras.losses.categorical_crossentropy):
+    model = keras.Sequential()
+
     if parameters['embed_size'] is not None:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
     else:  # else use autoencoder
@@ -107,9 +109,11 @@ def build_model(parameters, no_of_classes, input_length=None, gpus=1):
     # transform the model to a parallel one if multiple gpus are available.
     if gpus != 1:
         model = multi_gpu_model(model, gpus=gpus)
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['acc'])
-    model.build()
-    model.build(input_shape=(input_length,))
-    model.summary()
+
+    if optim and loss:
+        # compiling model
+        model.compile(optimizer=optim, loss=loss, metrics=['acc'])
+        model.build(input_shape=(input_length,))
+        model.summary()
 
     return model
