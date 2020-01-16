@@ -60,7 +60,8 @@ class Train:
         self.best_hparams = {}
 
         # setting up hparam scores dataframe
-        self.df = pd.DataFrame(columns=['dense', 'embed_size', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
+        self.df = pd.DataFrame(
+            columns=['dense', 'embed_size', 'enc_dim', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
         params_path = os.path.join(self.output, 'parameters.csv')
         if not self.force and os.path.isfile(params_path):
             try:
@@ -70,7 +71,7 @@ class Train:
                 print("Couldn\'t read previous parameters: {0}".format(str(e)))
 
         self.df = self.df.astype(
-            {'dense': int, 'embed_size': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
+            {'dense': int, 'embed_size': int, 'enc_dim': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
              'accuracy': float, })
 
     def run(self):
@@ -177,6 +178,7 @@ class Train:
         return {
             'dense': int(self.df['dense'].loc[best_idx]),
             'embed_size': int(self.df['embed_size'].loc[best_idx]),
+            'enc_dim': int(self.df['enc_dim'].loc[best_idx]),
             'filter': int(self.df['filter'].loc[best_idx]),
             'kernel': int(self.df['kernel'].loc[best_idx]),
             'layers': int(self.df['layers'].loc[best_idx]),
@@ -251,6 +253,7 @@ class Train:
                 verbose=self.verbose,
                 callbacks=callbacks_list,
             )
+            model.summary()
             try:
                 keras.utils.plot_model(model, self.model_dir('.png'), show_shapes=True)
             except Exception as e:

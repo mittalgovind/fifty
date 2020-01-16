@@ -87,24 +87,32 @@ def load_labels_tags(scenario):
 
 def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop',
                 loss=keras.losses.categorical_crossentropy):
+    input_shape = (input_length,)
     model = keras.Sequential()
 
     if parameters['embed_size'] is not 0:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
-    else:  # else use autoencoder
+    elif parameters['enc_dim'] is not 0:  # else use autoencoder
         model.add(Dense(256, activation='tanh'))
+        model.add(Reshape((input_length, 1)))  # equivalent to np.expand_dims(, -1)
+        model.add(Conv1D(parameters['enc_dim'], parameters['kernel'], activation='relu', input_shape=(input_length, 1)))
+
+    else:
+        raise ValueError(
+            'Both "embed_size"={} and "enc_dim"={} are invalid values. At least one of them must have a value.'.format(
+                parameters["embed_size"], parameters["enc_dim"]))
 
     if parameters['layers'] <= 0:
         raise ValueError(
             '\"layers\" parameter must be a positive integer, got \"layers\"={0}'.format(parameters['layers']))
 
     for _ in range(parameters['layers']):
-        model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
+        model.add(Conv1D(filters=parameters['filter'], kernel_size=parameters['kernel']))
         model.add(LeakyReLU(alpha=0.3))
         model.add(MaxPool1D(parameters['pool']))
 
     model.add(GlobalAveragePooling1D())
-    model.add(Dropout(0.1))
+    model.add(Dropout(0.3))
     model.add(Dense(parameters['dense']))
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dense(no_of_classes, activation='softmax'))
@@ -116,8 +124,8 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
     if optim is not None and loss is not None:
         # compiling model
         model.compile(optimizer=optim, loss=loss, metrics=['acc'])
-        model.build(input_shape=(input_length,))
-        model.summary()
+        # model.build(input_shape=input_shape)
+        # model.summary()
 
     return model
 
