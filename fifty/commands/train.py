@@ -258,6 +258,11 @@ class Train:
                 callbacks=callbacks_list,
                 initial_epoch=initial_epoch,
             )
+            try:
+                keras.utils.plot_model(model, self.model_dir('.png'), show_shapes=True)
+            except Exception as e:
+                print(f"Error plotting diagram: {e}")
+
             loss = min(history.history['val_loss'])
             accuracy = max(history.history['val_acc'])
             backend.clear_session()
