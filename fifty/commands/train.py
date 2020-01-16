@@ -5,13 +5,12 @@ import os
 import random
 import time
 
-import keras
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from hyperopt import partial, Trials, fmin, tpe, rand
 
-import keras as keras
+import keras
 from keras import callbacks, backend, models
 from keras.utils.np_utils import to_categorical
 
@@ -215,12 +214,12 @@ class Train:
 
         try:
             if load:  # load old model
-                print('loading old model...', end='')
+                print('loading old model...', end=' ')
                 start_time = time.time()
 
                 model = models.load_model(self.model_dir('.h5', params=parameters))
 
-                print('old model loaded in {:.3f}s, loading latest TFEvent summary...'.format(time.time() - start_time), end='')
+                print('old model loaded in {:.3f}s.'.format(time.time() - start_time), end=' ')
                 start_time = time.time()
 
                 print('model successfully loaded in {:.3f}s'.format(time.time() - start_time))
@@ -269,6 +268,11 @@ class Train:
             accuracy = 0
             loss = np.inf
 
+            # raise exception if not whitelisted
+            whitelisted_exceptions = ['Negative dimension size caused by subtracting']
+            if not list(filter(str(ve).__contains__, whitelisted_exceptions)):
+                raise ve
+
         print("Loss: {}".format(loss))
         print("Accuracy: {:.2%}".format(accuracy))
         return loss
@@ -292,7 +296,9 @@ class Train:
                 with open(self.paramspace, 'r', encoding='utf') as f:
                     paramspace = json_paramspace2hyperopt_paramspace(json.load(f))
             except FileNotFoundError as fnfe:
-                print(f'Paramspace file not found: "{self.paramspace}", this file must exist for hyperparameter exploration, please choose it using the "--paramspace" option', fnfe)
+                print(f'Paramspace file not found: "{self.paramspace}"\n'
+                      f'  this file must exist for hyperparameter exploration,'
+                      f'  please choose it using the "--paramspace" option', fnfe)
                 raise fnfe
             self.explore_hparam_space(paramspace)
         else:
@@ -339,7 +345,7 @@ class Train:
         print('\n-------------------------------------\n')
         print('Hyper-parameter space exploration ended')
 
-    def model_dir(self, ext=None, params=None):
+    def model_dir(self, ext=None, params=None) -> str:
         """
         :param params: dict
         :param ext: model extension (includes '.'). if None, will return a folder path only, not filename appended

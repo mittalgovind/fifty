@@ -1,14 +1,10 @@
 import os
-import re
 import json
-import pandas as pd
 import numpy as np
-import time
 import shutil
 from pathlib import Path
-from pdb import set_trace
 
-from keras import Sequential
+import keras
 from keras.layers import Embedding, Dense, Conv1D, LeakyReLU, MaxPool1D, GlobalAveragePooling1D, Dropout
 from keras.utils import multi_gpu_model
 
@@ -64,15 +60,14 @@ def make_output_folder(input, output, force=False):
     output = os.path.abspath(output)
     if os.path.exists(output):
         if force:
-            print("Warning! The output folder - {} - is being overwritten.".format(output))
+            print('Warning! The output folder is being overwritten: "{}"'.format(output))
             try:
                 shutil.rmtree(output)
             except:
                 pass
         else:  # load use the loaded hparams
-            print(
-                f'The output folder - "{output}" - already exists.'
-                f'Use [-f|--force] to overwrite it completely.')
+            print(f'The output folder already exists: "{output}"'
+                  f'\n  use [-f|--force] to overwrite it completely.')
     os.makedirs(output, exist_ok=True)
     return output
 
