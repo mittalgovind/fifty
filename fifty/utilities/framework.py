@@ -93,7 +93,7 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
                 loss=keras.losses.categorical_crossentropy):
     model = keras.Sequential()
 
-    if parameters['embed_size'] is not None:
+    if parameters['embed_size'] is not 0:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
     else:  # else use autoencoder
         model.add(Dense(256, activation='tanh'))

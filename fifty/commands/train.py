@@ -67,8 +67,8 @@ class Train:
         params_path = os.path.join(self.output, 'parameters.csv')
         if not self.force and os.path.isfile(params_path):
             try:
-                self.df = pd.read_csv(params_path).dropna(axis=0)
-                print(f"Found existing parameters in \"{params_path}\"")
+                self.df = pd.read_csv(params_path).fillna(0)  # replace NaN values with 0
+                print(f"Found existing parameters in \"{params_path}\" with {len(self.df)} entries")
             except Exception as e:
                 print("Couldn\'t read previous parameters: {0}".format(str(e)))
 
