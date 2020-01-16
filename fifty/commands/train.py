@@ -7,7 +7,6 @@ import time
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from hyperopt import partial, Trials, fmin, tpe, rand
 
 import keras
@@ -18,9 +17,8 @@ from fifty.utilities.framework import read_files, make_output_folder, load_label
 from utilities.framework import build_model
 from utilities.utils import json_paramspace2hyperopt_paramspace, dict_to_safe_filename
 
-tf.logging.set_verbosity(tf.logging.ERROR)
 
-
+# tf.logging.set_verbosity(tf.logging.ERROR)
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -191,25 +189,22 @@ class Train:
         print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
         # == formatting data ==
-        # shuffle
-        np.random.seed(99); np.random.shuffle(x_train)
-        np.random.seed(99); np.random.shuffle(one_hot_y_train)
-        np.random.seed(99); np.random.shuffle(x_val)
-        np.random.seed(99); np.random.shuffle(one_hot_y_val)
         # trim
         x_train_ = x_train[:int(np.ceil(len(x_train) * self.percent))]
         y_train_ = one_hot_y_train[:int(np.ceil(len(x_train) * self.percent))]
         x_val_ = x_val[:int(np.ceil(len(x_val) * self.percent))]
         y_val_ = one_hot_y_val[:int(np.ceil(len(x_val) * self.percent))]
 
-        # TODO: FIXME: fix this someday, it works but .fit() throws an exception: "AttributeError: 'DatasetV1Adapter' object has no attribute 'ndim'"
-        # train_dataset = tf.data.Dataset.from_tensor_slices((x_train, one_hot_y_train)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
-        # val_dataset = tf.data.Dataset.from_tensor_slices((x_val, one_hot_y_val)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        # # TODO: FIXME: fix this someday, it works but .fit() throws an exception: "AttributeError: 'DatasetV1Adapter' object has no attribute 'ndim'"
+        # train_dataset = tf.data.Dataset.from_tensor_slices((x_train_, y_train_)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        # val_dataset = tf.data.Dataset.from_tensor_slices((x_val_, y_val_)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+
+        ## Training Data loaded with shape:   (819200, 512) and labels with shape - (819200, 2)
+        ## Validation Data loaded with shape: (102400, 512) and labels with shape - (102400, 2)
 
         # load existing model if exists
         model_dir = self.model_dir(None, params=parameters)
 
-        initial_epoch = 0
         log_dir = os.path.join(model_dir, 'fit')
 
         try:
@@ -230,7 +225,6 @@ class Train:
 
                 model = build_model(parameters, no_of_classes=self.no_of_classes, input_length=self.block_size,
                                     gpus=self.gpus, optim=optim, loss=loss_func)
-                model.summary()
 
             print(f"Model in: \"{self.model_dir('.h5', params=parameters)}\"")
 
@@ -245,7 +239,7 @@ class Train:
             ]
             if epochs > 1:
                 # tensorboard logging
-                callbacks_list.append(keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, embeddings_freq=0))
+                callbacks_list.append(callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, embeddings_freq=0))
 
             os.makedirs(model_dir, exist_ok=True)
             history = model.fit(
@@ -256,7 +250,6 @@ class Train:
                 validation_data=(x_val_, y_val_),
                 verbose=self.verbose,
                 callbacks=callbacks_list,
-                initial_epoch=initial_epoch,
             )
             try:
                 keras.utils.plot_model(model, self.model_dir('.png'), show_shapes=True)

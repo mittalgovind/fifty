@@ -16,7 +16,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pylab as plt
 from matplotlib import rcParams, cycler
 import matplotlib as mpl
-tf.logging.set_verbosity(tf.logging.ERROR)
+# tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.models import load_model
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
 

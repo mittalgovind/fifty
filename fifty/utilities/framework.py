@@ -5,8 +5,9 @@ import shutil
 from pathlib import Path
 
 import keras
-from keras.layers import Embedding, Dense, Conv1D, LeakyReLU, MaxPool1D, GlobalAveragePooling1D, Dropout
-from keras.utils import multi_gpu_model
+import tensorflow as tf
+from keras.layers import Embedding, Dense, Conv1D, LeakyReLU, MaxPool1D, GlobalAveragePooling1D, Dropout, Reshape, \
+    Input, UpSampling1D
 
 
 def get_utilities_dir():
@@ -92,23 +93,39 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
     else:  # else use autoencoder
         model.add(Dense(256, activation='tanh'))
+
+    if parameters['layers'] <= 0:
+        raise ValueError(
+            '\"layers\" parameter must be a positive integer, got \"layers\"={0}'.format(parameters['layers']))
+
     for _ in range(parameters['layers']):
         model.add(Conv1D(filters=int(parameters['filter']), kernel_size=parameters['kernel']))
         model.add(LeakyReLU(alpha=0.3))
         model.add(MaxPool1D(parameters['pool']))
+
     model.add(GlobalAveragePooling1D())
     model.add(Dropout(0.1))
     model.add(Dense(parameters['dense']))
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dense(no_of_classes, activation='softmax'))
+
     # transform the model to a parallel one if multiple gpus are available.
     if gpus != 1:
-        model = multi_gpu_model(model, gpus=gpus)
+        model = keras.utils.multi_gpu_model(model, gpus=gpus)
 
-    if optim and loss:
+    if optim is not None and loss is not None:
         # compiling model
         model.compile(optimizer=optim, loss=loss, metrics=['acc'])
         model.build(input_shape=(input_length,))
         model.summary()
 
     return model
+
+
+
+def get_latest_tfevent_summary(log_dir):
+    latest_tfeventfile_path = os.path.join(log_dir, max(os.listdir(log_dir)))
+    # get last summary with max step
+    iterator = tf.train.summary_iterator(latest_tfeventfile_path)
+    latest_summary = max(iterator, key=lambda s: s.step)
+    return latest_summary
