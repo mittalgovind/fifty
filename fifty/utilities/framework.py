@@ -93,10 +93,9 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
     if parameters['embed_size'] is not 0:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
     elif parameters['enc_dim'] is not 0:  # else use autoencoder
-        model.add(Dense(256, activation='tanh'))
         model.add(Reshape((input_length, 1)))  # equivalent to np.expand_dims(, -1)
         model.add(Conv1D(parameters['enc_dim'], parameters['kernel'], activation='relu', input_shape=(input_length, 1)))
-
+        # model.add(encoder)
     else:
         raise ValueError(
             'Both "embed_size"={} and "enc_dim"={} are invalid values. At least one of them must have a value.'.format(
@@ -129,6 +128,53 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
 
     return model
 
+
+def build_autoencoder(parameters: dict, input_shape: tuple):
+    """
+    :param parameters: dictionary containing params {layers, filter, kernel, pool}
+    :param input_shape:
+    :return: encoder, decoder, autoencoder
+    """
+    input_data = Input(shape=input_shape)
+    autoenc_input_shape = input_shape + (1,)
+
+    # reshaping the data
+    x = Reshape(autoenc_input_shape)(input_data)
+
+    # ENCODER architecture
+    for i in range(parameters['layers']):
+        x = Conv1D(parameters['filter'] // (2 ** i), parameters['kernel'], activation='relu', padding='same')(x)
+        x = MaxPool1D(parameters['pool'], padding='same')(x)
+    encoded = MaxPool1D(parameters['pool'], padding='same')(x)
+    encoder = keras.models.Model(input_data, encoded)
+    encoder.name = 'encoder'
+
+    # DECODING architecture
+    decoder_input = Input(shape=encoded.shape[1:])  # removing the batch dimension for the encoded shape
+    x = decoder_input
+    for i in reversed(range(parameters['layers'])):
+        x = Conv1D(parameters['filter'] // (2 ** i), parameters['kernel'], activation='relu', padding='same')(x)
+        x = UpSampling1D(parameters['pool'])(x)
+    decoded = Conv1D(autoenc_input_shape[-1], parameters['kernel'], padding='same')(x)
+    decoded = Reshape(decoded.shape[1:-1])(decoded)  # squeezing dimensions, removing that last (..., 1) in the shape
+    # define decoder model
+    decoder = keras.models.Model(decoder_input, decoded)
+    decoder.name = 'decoder'
+
+    # AUTOENCODER, connecting encoder and decoder
+    input_ = Input(shape=input_shape)
+    encoded_ = encoder(input_)
+    decoded_ = decoder(encoded_)
+
+    autoencoder = keras.models.Model(input_, decoded_)
+    autoencoder.name = 'autoencoder'
+    autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
+
+    print('autoencoder structure, showing shapes: input:{} -> encoded:{} -> decoded:{}'.format(
+        input_.shape, encoded_.shape, decoded_.shape))
+
+    # autoencoder.summary()
+    return encoder, decoder, autoencoder
 
 
 def get_latest_tfevent_summary(log_dir):
