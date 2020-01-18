@@ -128,7 +128,7 @@ The following command assumes that the folder structure is as follows:
 And assumes scenario 6, and that the dataset is in a folder is `./data/512_6/`     
 
 ```sh
-python cli.py train --output ./output -d ./data/512_6 --percent 0.00001 --block-size 512 --scenario 6
+python cli.py train --output ./output -d ./data/512_6 --percent 0.00001 --block-size 512
 ```
 
 `--percent 0.00001` is used to speed up testing. 

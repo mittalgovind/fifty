@@ -55,8 +55,6 @@ class Train:
         self.options = options
 
         self.dataset = (np.array([]), np.array([]), np.array([]), np.array([]))
-        self.last_dense_layer = [75, 11, 25, 5, 2, 2]
-        self.no_of_classes = self.last_dense_layer[self.scenario - 1]
         self.best_hparams = {}
 
         # setting up hparam scores dataframe
@@ -190,6 +188,10 @@ class Train:
 
         print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
+
+        no_of_classes = one_hot_y_train.shape[1]
+        print('no_of_classes={}'.format(no_of_classes))
+
         # == formatting data ==
         # trim
         x_train_ = x_train[:int(np.ceil(len(x_train) * self.percent))]

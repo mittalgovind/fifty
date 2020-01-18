@@ -3,7 +3,7 @@ FiFTy: File-Fragment Type Classifier using Neural Networks
 
 Usage:
   fifty whatis <input> [-r] [-b BLOCK_SIZE] [-s SCENARIO] [-o OUTPUT] [--block-wise]  [-f] [-l] [-v] [-vv] [-vvv] [-m MODEL_NAME]
-  fifty train [-d DATA_DIR] [-b BLOCK_SIZE] [-s SCENARIO] [-o OUTPUT] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [-f] [--down SCALE_DOWN] [--up] [--paramspace PARAMSPACE_JSON] [--epochs EPOCHS] [-v] [-vv] [-vvv] [-m MODEL_NAME]
+  fifty train [-d DATA_DIR] [-b BLOCK_SIZE] [-o OUTPUT] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [-f] [--down SCALE_DOWN] [--up] [--paramspace PARAMSPACE_JSON] [--epochs EPOCHS] [-v] [-vv] [-vvv] [-m MODEL_NAME]
   fifty -h | --help
   fifty --version
 
