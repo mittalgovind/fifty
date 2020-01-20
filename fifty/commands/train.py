@@ -185,12 +185,10 @@ class Train:
 
     def train_network(self, parameters, epochs=1, load=False):
         batch_size = 128
-
-        print(f"\nParameters: {parameters}")
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
-
         no_of_classes = one_hot_y_train.shape[1]
-        print('no_of_classes={}'.format(no_of_classes))
+
+        print(f"\ntrain_network(parameters={parameters}, epochs={epochs}, load={load}), no_of_classes={no_of_classes}")
 
         # == formatting data ==
         # trim
@@ -211,6 +209,9 @@ class Train:
 
         log_dir = os.path.join(model_dir, 'fit')
 
+        parameters['accuracy'] = 0.
+        parameters['loss'] = np.inf
+
         try:
             if load:  # load old model
                 print('loading old model...', end=' ')
@@ -227,7 +228,7 @@ class Train:
                 optim = keras.optimizers.rmsprop(lr=0.0005, rho=0.9)
                 loss_func = keras.losses.categorical_crossentropy
 
-                model = build_model(parameters, no_of_classes=self.no_of_classes, input_length=self.block_size,
+                model = build_model(parameters, no_of_classes=no_of_classes, input_length=self.block_size,
                                     gpus=self.gpus, optim=optim, loss=loss_func)
 
             print(f"Model in: \"{self.model_dir('.h5', params=parameters)}\"")
@@ -261,24 +262,30 @@ class Train:
             except Exception as e:
                 print(f"Error plotting diagram: {e}")
 
-            loss = min(history.history['val_loss'])
-            accuracy = max(history.history['val_acc'])
+            parameters['loss'] = min(history.history['val_loss'])
+            if 'val_acc' in history.history:
+                parameters['accuracy'] = max(history.history['val_acc'])
+
+            print()
+            print('columns: {}, parameters: {}'.format(set(self.df.columns), set(parameters.keys())))
+            # extending df.columns
+            row = {k: 0 for k in self.df.columns}
+            row.update(parameters)
+
+            self.df.loc[len(self.df)] = row
             backend.clear_session()
-            parameters['accuracy'] = accuracy
-            self.df.loc[len(self.df)] = parameters
         except ValueError as ve:
             print('!!ERROR: {0}'.format(ve))
-            accuracy = 0
-            loss = np.inf
 
             # raise exception if not whitelisted
-            whitelisted_exceptions = ['Negative dimension size caused by subtracting']
+            whitelisted_exceptions = ['Negative dimension size caused by subtracting',
+                                      'Error when checking target: expected ']
             if not list(filter(str(ve).__contains__, whitelisted_exceptions)):
                 raise ve
 
-        print("Loss: {}".format(loss))
-        print("Accuracy: {:.2%}".format(accuracy))
-        return loss
+        print("Loss: {}".format(parameters['loss']))
+        print("Accuracy: {:.2%}".format(parameters['accuracy']))
+        return parameters['loss']
 
     def train_model(self):
         """ explores the hyperparameter space and then trains the best model"""
@@ -292,20 +299,25 @@ class Train:
         else:
             self.load_dataset()
 
+        if len(self.df) > 0:
+            print('Hparam space already explored, using existing "parameters.csv" file')
         # if empty dataframe, perform hparam search, else hparams space already explored
-        if len(self.df) == 0 or self.force:
+        elif self.force:
             try:
                 # loading paramspace json file
                 with open(self.paramspace, 'r', encoding='utf') as f:
                     paramspace = json_paramspace2hyperopt_paramspace(json.load(f))
             except FileNotFoundError as fnfe:
-                print(f'Paramspace file not found: "{self.paramspace}"\n'
-                      f'  this file must exist for hyperparameter exploration,'
-                      f'  please choose it using the "--paramspace" option', fnfe)
+                print(f'Paramspace file not found: "{self.paramspace}". '
+                      f'Please specify a valid file for hyperparameter exploration using the "--paramspace" option',
+                      fnfe)
                 raise fnfe
             self.explore_hparam_space(paramspace)
-        else:
-            print('Hparam space already explored, using existing "parameters.csv" file')
+
+        elif not self.force:
+            raise FileNotFoundError(f"The dataset wasn't loaded/ doesn't already exist: \"{self.output}\". "
+                                    "Ensure a valid dataset exists, "
+                                    "or force creation of a new dataset by specify the \"--force\" or \"-f\" option.")
 
         self.best_hparams = self.get_best()
         print('Best hyperparams:', self.best_hparams,
