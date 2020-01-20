@@ -14,7 +14,7 @@ from keras import callbacks, backend, models
 from keras.utils.np_utils import to_categorical
 
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
-from utilities.framework import build_model
+from utilities.framework import build_model, build_autoencoder
 from utilities.utils import json_paramspace2hyperopt_paramspace, dict_to_safe_filename
 
 
@@ -51,6 +51,8 @@ class Train:
         self.recursive = bool(options['--recursive'])
         self.paramspace = options['--paramspace']
         self.epochs = int(options['--epochs'])
+        self.is_train_autoencoder = bool(options['--autoencoder'])
+
         self.args = args
         self.options = options
 
@@ -75,6 +77,10 @@ class Train:
     def run(self):
         self.output = make_output_folder(self.input, self.output, self.force)
         self.train_model()
+
+        if self.is_train_autoencoder:
+            print("--autoencoder is true, so there will be no predicting on the WhatIs tool.")
+            return
 
         if self.input is None:
             raise Exception('No input file given for inference on trained model.')
@@ -238,22 +244,32 @@ class Train:
 
                 print('model successfully loaded in {:.3f}s'.format(time.time() - start_time))
             else:  # default: build new model
-                # manually defining optimizer and loss
-                optim = keras.optimizers.rmsprop(lr=0.0005, rho=0.9)
-                loss_func = keras.losses.categorical_crossentropy
 
-                model = build_model(parameters, no_of_classes=no_of_classes, input_length=self.block_size,
-                                    gpus=self.gpus, optim=optim, loss=loss_func)
+                if self.is_train_autoencoder:
+                    encoder, decoder, autoencoder = build_autoencoder(parameters, input_shape=(self.block_size,))
+
+                    model = autoencoder
+                    y_train_ = x_train_
+                    y_val_ = x_val_
+                else:
+                    # manually defining optimizer and loss
+                    optim = keras.optimizers.rmsprop(lr=0.0005, rho=0.9)
+                    loss_func = keras.losses.categorical_crossentropy
+
+                    model = build_model(parameters, no_of_classes=no_of_classes, input_length=self.block_size,
+                                        gpus=self.gpus, optim=optim, loss=loss_func)
 
             print(f"Model in: \"{self.model_dir('.h5', params=parameters)}\"")
 
+            monitor = 'val_loss' if self.is_train_autoencoder else 'val_acc'
+
             callbacks_list = [
-                callbacks.EarlyStopping(monitor='val_acc', patience=5, restore_best_weights=True, min_delta=0.03),
+                callbacks.EarlyStopping(monitor=monitor, patience=5, restore_best_weights=True, min_delta=0.03),
                 # saving model with exact name
-                callbacks.ModelCheckpoint(self.model_dir('.h5'), monitor='val_acc'),
+                callbacks.ModelCheckpoint(self.model_dir('.h5'), monitor=monitor),
                 callbacks.CSVLogger(filename=(self.model_dir('.log')), append=True),
                 # saving model hparam_str in name
-                callbacks.ModelCheckpoint(self.model_dir('.h5', params=parameters), monitor='val_acc'),
+                callbacks.ModelCheckpoint(self.model_dir('.h5', params=parameters), monitor=monitor),
                 callbacks.CSVLogger(filename=(self.model_dir('.log', params=parameters)), append=True),
             ]
             if epochs > 1:
@@ -383,7 +399,7 @@ class Train:
         path = self.output
         # removing blacklisted attributes
         if params is not None:
-            params = {k: v for k, v in params.items() if k not in ['loss', 'accuracy']}
+            params = {k: v for k, v in params.items() if k not in ['loss', 'accuracy', 'enc_dim']}
 
         # append_params
         if params is not None:
