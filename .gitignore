@@ -10,6 +10,9 @@ fifty/data/
 
 /__pycache__/
 *.pyc
+
 fifty/output/
 
-fifty/output.zip
+_ignore/
+
+fifty/output_autoencoder/
