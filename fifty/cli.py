@@ -28,7 +28,7 @@ Options:
   --epochs EPOCHS                           Number of epochs to train the final network [default: 10].
   --down SCALE_DOWN                         Path to file with specific filetypes (from our list of 75 filetypes). See utilities/scale_down.txt for reference [default: ../scale_down.txt].
   --up                                      Train with newer filetypes. Please refer documentation. [default: False]
-  --paramspace PARAMSPACE_JSON              Path to JSON file with model hyperparameter choices [defaults to "./hparamspace.json", and "./hparamspace_autoencoder.json" if --autoencoder flag is set]. [default: '']
+  --paramspace PARAMSPACE_JSON              Path to JSON file with model hyperparameter choices [defaults to "./hparamspace.json", and "./hparamspace_autoencoder.json" if --autoencoder flag is set]. [default: ]
   -t, --autoencoder                         Set to True if you want to train the autoencoder, else train the FiFTy models. [default: False]
 
 """

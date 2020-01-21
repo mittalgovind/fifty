@@ -92,14 +92,14 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
 
     if parameters['embed_size'] is not 0:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
-    elif parameters['enc_dim'] is not 0:  # else use autoencoder
-        raise Exception('"enc_dim" not yet supported')
+    elif parameters['use_encoder'] is not 0:  # else use autoencoder
+        raise Exception('"use_encoder" not yet supported')
         pass
         # model.add(encoder)
     else:
         raise ValueError(
-            'Both "embed_size"={} and "enc_dim"={} are invalid values. At least one of them must have a value.'.format(
-                parameters["embed_size"], parameters["enc_dim"]))
+            'Both "embed_size"={} and "use_encoder"={} are invalid values. At least one of them must have a value.'.format(
+                parameters["embed_size"], parameters["use_encoder"]))
 
     if parameters['layers'] <= 0:
         raise ValueError(

@@ -51,32 +51,53 @@ class Train:
         self.recursive = bool(options['--recursive'])
         self.epochs = int(options['--epochs'])
         self.is_train_autoencoder = bool(options['--autoencoder'])
-        self.paramspace = options['--paramspace']
-
-        if self.paramspace == '':
-            self.paramspace = './hparamspace.json' if not self.is_train_autoencoder \
-                else './hparamspace_autoencoder.json'
+        self.dataset = (np.array([]), np.array([]), np.array([]), np.array([]))
+        self.best_hparams = {}
 
         self.args = args
         self.options = options
 
-        self.dataset = (np.array([]), np.array([]), np.array([]), np.array([]))
-        self.best_hparams = {}
+        self.paramspace = options['--paramspace']
+        if self.paramspace == "":  # if not passed, autoselect
+            self.paramspace = './hparamspace.json' if not self.is_train_autoencoder \
+                else './hparamspace_autoencoder.json'
+        # loading hparamspace json
+        pspace_file = self.paramspace
+        try:
+            # loading paramspace json file
+            with open(pspace_file, 'r', encoding='utf') as f:
+                self.paramspace = json_paramspace2hyperopt_paramspace(json.load(f))
+        except FileNotFoundError as fnfe:
+            print(f'Paramspace file not found: "{pspace_file}". '
+                  f'Please specify a valid file for hyperparameter exploration using the "--paramspace" option', fnfe)
+            raise fnfe
+
 
         # setting up hparam scores dataframe
-        self.df = pd.DataFrame(
-            columns=['dense', 'embed_size', 'enc_dim', 'filter', 'kernel', 'layers', 'pool', 'accuracy', 'loss'])
+        types_dict = {'dense': int, 'embed_size': int, 'use_encoder': int, 'filter': int, 'kernel': int, 'layers': int,
+                      'pool': int, 'accuracy': float, 'loss': float, }
+
+        self.df = None
+        # try to load dataframe
         params_path = os.path.join(self.output, 'parameters.csv')
         if not self.force and os.path.isfile(params_path):
             try:
                 self.df = pd.read_csv(params_path).fillna(0)  # replace NaN values with 0
-                print(f"Found existing parameters in \"{params_path}\" with {len(self.df)} entries")
+                print(f'Found existing parameters in "{params_path}" with {len(self.df)} entries')
             except Exception as e:
-                print("Couldn\'t read previous parameters: {0}".format(str(e)))
+                print("Couldn't read previous parameters: {0}".format(str(e)))
 
-        self.df = self.df.astype(
-            {'dense': int, 'embed_size': int, 'enc_dim': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
-             'accuracy': float, 'loss': float, })
+        # if not loaded, create an empty one
+        if self.df is None:
+            # limit the attributes to only those in the paramspace json
+            types_dict = {k: v for k, v in types_dict.items() if k in (['accuracy', 'loss'] + list(self.paramspace.keys()))}
+            self.df = pd.DataFrame(columns=list(types_dict.keys())).astype(types_dict)
+
+        # checking --force option
+        if not len(self.df) and not self.force:
+            raise FileNotFoundError(f"The dataset wasn't loaded, doesn't already exist or is empty: \"{self.output}\". "
+                                    "Ensure a valid dataset exists, "
+                                    "or force creation of a new dataset by specify the \"--force\" or \"-f\" option.")
 
     def run(self):
         self.output = make_output_folder(self.input, self.output, self.force)
@@ -181,7 +202,8 @@ class Train:
             "Validation Data loaded with shape: {} and labels with shape - {}".format(x_val.shape, one_hot_y_val.shape))
         self.dataset = x_train, one_hot_y_train, x_val, one_hot_y_val
 
-    def get_best(self):
+    def get_best(self) -> dict:
+        """ :return: dictionary containing the best hyperparameter keys and values """
         if len(self.df) == 0:
             raise Exception("get_best(): hparam dataframe is empty, there were no successfully trained models. "
                             "Make sure the hyperparameters are correct, also try increasing the --max-evals value.")
@@ -197,15 +219,7 @@ class Train:
                   'using "loss" to sort instead.')
             print("Best params achieve loss={}".format(self.df.loc[best_idx, 'loss']))
 
-        return {
-            'dense': int(self.df.loc[best_idx, 'dense']),
-            'embed_size': int(self.df.loc[best_idx, 'embed_size']),
-            'enc_dim': int(self.df.loc[best_idx, 'enc_dim']),
-            'filter': int(self.df.loc[best_idx, 'filter']),
-            'kernel': int(self.df.loc[best_idx, 'kernel']),
-            'layers': int(self.df.loc[best_idx, 'layers']),
-            'pool': int(self.df.loc[best_idx, 'pool']),
-        }
+        return {col: (self.df.loc[best_idx, col]) for col in self.df.columns}
 
     def train_network(self, parameters, epochs=1, load=False):
         batch_size = 128
@@ -220,10 +234,6 @@ class Train:
         y_train_ = one_hot_y_train[:int(np.ceil(len(x_train) * self.percent))]
         x_val_ = x_val[:int(np.ceil(len(x_val) * self.percent))]
         y_val_ = one_hot_y_val[:int(np.ceil(len(x_val) * self.percent))]
-
-        # # TODO: FIXME: fix this someday, it works but .fit() throws an exception: "AttributeError: 'DatasetV1Adapter' object has no attribute 'ndim'"
-        # train_dataset = tf.data.Dataset.from_tensor_slices((x_train_, y_train_)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
-        # val_dataset = tf.data.Dataset.from_tensor_slices((x_val_, y_val_)).shuffle(1024).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
 
         ## Training Data loaded with shape:   (819200, 512) and labels with shape - (819200, 2)
         ## Validation Data loaded with shape: (102400, 512) and labels with shape - (102400, 2)
@@ -263,7 +273,7 @@ class Train:
                     model = build_model(parameters, no_of_classes=no_of_classes, input_length=self.block_size,
                                         gpus=self.gpus, optim=optim, loss=loss_func)
 
-            print(f"Model in: \"{self.model_dir('.h5', params=parameters)}\"")
+            print(f"Model path: \"{self.model_dir('.h5', params=parameters)}\"")
 
             monitor = 'val_loss' if self.is_train_autoencoder else 'val_acc'
 
@@ -294,19 +304,14 @@ class Train:
             try:
                 keras.utils.plot_model(model, self.model_dir('.png'), show_shapes=True)
             except Exception as e:
-                print(f"Error plotting diagram: {e}")
+                print(f"Couln't plot diagram: {e}")
 
             parameters['loss'] = min(history.history['val_loss'])
             if 'val_acc' in history.history:
                 parameters['accuracy'] = max(history.history['val_acc'])
 
             print()
-            print('columns: {}, parameters: {}'.format(set(self.df.columns), set(parameters.keys())))
-            # extending df.columns
-            row = {k: 0 for k in self.df.columns}
-            row.update(parameters)
-
-            self.df.loc[len(self.df)] = row
+            self.df.loc[len(self.df)] = parameters
             backend.clear_session()
         except ValueError as ve:
             print('!!ERROR: {0}'.format(ve))
@@ -333,25 +338,14 @@ class Train:
         else:
             self.load_dataset()
 
-        if len(self.df) > 0:
+        # we know at this point that either --force is set, or there exists a dataset
+        if self.force:
+            # if empty dataframe, perform hparam search, else hparams space already explored
+            self.explore_hparam_space(self.paramspace)
+        elif len(self.df) > 0:
             print('Hparam space already explored, using existing "parameters.csv" file')
-        # if empty dataframe, perform hparam search, else hparams space already explored
-        elif self.force:
-            try:
-                # loading paramspace json file
-                with open(self.paramspace, 'r', encoding='utf') as f:
-                    paramspace = json_paramspace2hyperopt_paramspace(json.load(f))
-            except FileNotFoundError as fnfe:
-                print(f'Paramspace file not found: "{self.paramspace}". '
-                      f'Please specify a valid file for hyperparameter exploration using the "--paramspace" option',
-                      fnfe)
-                raise fnfe
-            self.explore_hparam_space(paramspace)
-
-        elif not self.force:
-            raise FileNotFoundError(f"The dataset wasn't loaded/ doesn't already exist: \"{self.output}\". "
-                                    "Ensure a valid dataset exists, "
-                                    "or force creation of a new dataset by specify the \"--force\" or \"-f\" option.")
+        else:
+            raise Exception()
 
         self.best_hparams = self.get_best()
         print('Best hyperparams:', self.best_hparams,
@@ -403,11 +397,11 @@ class Train:
         path = self.output
         # removing blacklisted attributes
         if params is not None:
-            params = {k: v for k, v in params.items() if k not in ['loss', 'accuracy', 'enc_dim']}
+            params = {k: v for k, v in params.items() if k not in ['loss', 'accuracy']}
 
         # append_params
         if params is not None:
-            path = os.path.join(path, f'{self.model_name}_{dict_to_safe_filename(params)}')
+            path = os.path.join(path, f'{self.model_name}{dict_to_safe_filename(params)}')
 
         if ext is not None:
             path = os.path.join(path, f'{self.model_name}{ext}')
