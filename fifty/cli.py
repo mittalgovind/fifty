@@ -3,7 +3,7 @@ FiFTy: File-Fragment Type Classifier using Neural Networks
 
 Usage:
   fifty whatis <input> [-r] [-b BLOCK_SIZE] [-s SCENARIO] [-o OUTPUT] [--block-wise]  [-f] [-l] [-v] [-vv] [-vvv] [-m MODEL_NAME]
-  fifty train [-d DATA_DIR] [-b BLOCK_SIZE] [-o OUTPUT] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [-f] [--down SCALE_DOWN] [--up] [--paramspace PARAMSPACE_JSON] [--epochs EPOCHS] [-v] [-vv] [-vvv] [-m MODEL_NAME]
+  fifty train [-d DATA_DIR] [-b BLOCK_SIZE] [-o OUTPUT] [-a ALGO] [-g GPUS] [-p PERCENT] [-n MAX_EVALS] [--autoencoder] [-f] [--down SCALE_DOWN] [--up] [--paramspace PARAMSPACE_JSON] [--epochs EPOCHS] [-v] [-vv] [-vvv] [-m MODEL_NAME]
   fifty -h | --help
   fifty --version
 
@@ -29,6 +29,7 @@ Options:
   --down SCALE_DOWN                         Path to file with specific filetypes (from our list of 75 filetypes). See utilities/scale_down.txt for reference [default: ../scale_down.txt].
   --up                                      Train with newer filetypes. Please refer documentation. [default: False]
   --paramspace PARAMSPACE_JSON              Path to JSON file with model hyperparameter choices [default: ./parameter_space.json].
+  --autoencoder                             Set to True if you want to train the autoencoder, else trains the FiFTy models. [default: False]
 
 """
 

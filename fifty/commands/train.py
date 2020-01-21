@@ -59,7 +59,7 @@ class Train:
 
         # setting up hparam scores dataframe
         self.df = pd.DataFrame(
-            columns=['dense', 'embed_size', 'enc_dim', 'filter', 'kernel', 'layers', 'pool', 'accuracy'])
+            columns=['dense', 'embed_size', 'enc_dim', 'filter', 'kernel', 'layers', 'pool', 'accuracy', 'loss'])
         params_path = os.path.join(self.output, 'parameters.csv')
         if not self.force and os.path.isfile(params_path):
             try:
@@ -70,7 +70,7 @@ class Train:
 
         self.df = self.df.astype(
             {'dense': int, 'embed_size': int, 'enc_dim': int, 'filter': int, 'kernel': int, 'layers': int, 'pool': int,
-             'accuracy': float, })
+             'accuracy': float, 'loss': float, })
 
     def run(self):
         self.output = make_output_folder(self.input, self.output, self.force)
@@ -171,16 +171,30 @@ class Train:
             "Validation Data loaded with shape: {} and labels with shape - {}".format(x_val.shape, one_hot_y_val.shape))
         self.dataset = x_train, one_hot_y_train, x_val, one_hot_y_val
 
-    def get_best(self, ):
-        best_idx = self.df['accuracy'].idxmax()
+    def get_best(self):
+        if len(self.df) == 0:
+            raise Exception("get_best(): hparam dataframe is empty, there were no successfully trained models. "
+                            "Make sure the hyperparameters are correct, also try increasing the --max-evals value.")
+
+        # if "accuracy" is unique, then use it
+        if 'accuracy' in self.df and self.df[['accuracy']].nunique().sum() > 1:
+            best_idx = self.df['accuracy'].idxmax()
+            print("Best params achieve accuracy={}".format(self.df.loc[best_idx, 'accuracy']))
+        else:
+            best_idx = self.df['loss'].idxmin()
+            print('info: while getting best params, '
+                  '"accuracy" value not found in df or is not unique enough to sort by, '
+                  'using "loss" to sort instead.')
+            print("Best params achieve loss={}".format(self.df.loc[best_idx, 'loss']))
+
         return {
-            'dense': int(self.df['dense'].loc[best_idx]),
-            'embed_size': int(self.df['embed_size'].loc[best_idx]),
-            'enc_dim': int(self.df['enc_dim'].loc[best_idx]),
-            'filter': int(self.df['filter'].loc[best_idx]),
-            'kernel': int(self.df['kernel'].loc[best_idx]),
-            'layers': int(self.df['layers'].loc[best_idx]),
-            'pool': int(self.df['pool'].loc[best_idx]),
+            'dense': int(self.df.loc[best_idx, 'dense']),
+            'embed_size': int(self.df.loc[best_idx, 'embed_size']),
+            'enc_dim': int(self.df.loc[best_idx, 'enc_dim']),
+            'filter': int(self.df.loc[best_idx, 'filter']),
+            'kernel': int(self.df.loc[best_idx, 'kernel']),
+            'layers': int(self.df.loc[best_idx, 'layers']),
+            'pool': int(self.df.loc[best_idx, 'pool']),
         }
 
     def train_network(self, parameters, epochs=1, load=False):
@@ -367,6 +381,9 @@ class Train:
         :return:
         """
         path = self.output
+        # removing blacklisted attributes
+        if params is not None:
+            params = {k: v for k, v in params.items() if k not in ['loss', 'accuracy']}
 
         # append_params
         if params is not None:

@@ -58,7 +58,7 @@ def make_output_folder(input, output, force=False):
             else:
                 output = 'fifty_{}'.format(file_name)
 
-    output = os.path.abspath(output)
+    output = (output)
     if os.path.exists(output):
         if force:
             print('Warning! The output folder is being overwritten: "{}"'.format(output))
@@ -93,8 +93,8 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
     if parameters['embed_size'] is not 0:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
     elif parameters['enc_dim'] is not 0:  # else use autoencoder
-        model.add(Reshape((input_length, 1)))  # equivalent to np.expand_dims(, -1)
-        model.add(Conv1D(parameters['enc_dim'], parameters['kernel'], activation='relu', input_shape=(input_length, 1)))
+        raise Exception('"enc_dim" not yet supported')
+        pass
         # model.add(encoder)
     else:
         raise ValueError(
@@ -170,7 +170,7 @@ def build_autoencoder(parameters: dict, input_shape: tuple):
     autoencoder.name = 'autoencoder'
     autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
 
-    print('autoencoder structure, showing shapes: input:{} -> encoded:{} -> decoded:{}'.format(
+    print('Autoencoder structure: input:{} -> encoded:{} -> decoded:{}'.format(
         input_.shape, encoded_.shape, decoded_.shape))
 
     # autoencoder.summary()
