@@ -49,9 +49,13 @@ class Train:
         self.scenario = int(options['--scenario'])
         self.force = bool(options['--force'])
         self.recursive = bool(options['--recursive'])
-        self.paramspace = options['--paramspace']
         self.epochs = int(options['--epochs'])
         self.is_train_autoencoder = bool(options['--autoencoder'])
+        self.paramspace = options['--paramspace']
+
+        if self.paramspace == '':
+            self.paramspace = './hparamspace.json' if not self.is_train_autoencoder \
+                else './hparamspace_autoencoder.json'
 
         self.args = args
         self.options = options
