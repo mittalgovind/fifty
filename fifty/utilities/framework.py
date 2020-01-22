@@ -1,5 +1,7 @@
 import os
 import json
+import time
+
 import numpy as np
 import shutil
 from pathlib import Path
@@ -85,21 +87,30 @@ def load_labels_tags(scenario):
     return labels, tags
 
 
-def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop',
+def build_model(parameters, no_of_classes, input_length, gpus=1, optimizer='rmsprop',
                 loss=keras.losses.categorical_crossentropy):
     input_shape = (input_length,)
     model = keras.Sequential()
 
     if parameters['embed_size'] is not 0:
         model.add(Embedding(256, parameters['embed_size'], input_length=input_length))
-    elif parameters['use_encoder'] is not 0:  # else use autoencoder
-        raise Exception('"use_encoder" not yet supported')
-        pass
-        # model.add(encoder)
+    elif parameters['encoder']:  # else use autoencoder
+        start_time = time.time()
+        print(f'loading encoder: "{parameters["encoder"]}"...', end='')
+        try:
+            encoder = keras.models.load_model(parameters['encoder']).layers[1]
+        except FileNotFoundError as fnfe:
+            raise FileNotFoundError(f'Error loading encoder: "{parameters["encoder"]}"'
+                                    f'the "encoder" argument must be a path to a saved encoder model, '
+                                    f'example: "./encoder_output/encoder_model.h5"', fnfe)
+
+        print('encoder loaded in {:.2f}'.format(time.time() - start_time))
+
+        model.add(encoder)
     else:
         raise ValueError(
-            'Both "embed_size"={} and "use_encoder"={} are invalid values. At least one of them must have a value.'.format(
-                parameters["embed_size"], parameters["use_encoder"]))
+            'Both "embed_size"={} and "encoder"={} are invalid values. At least one of them must have a value.'.format(
+                parameters["embed_size"], parameters["encoder"]))
 
     if parameters['layers'] <= 0:
         raise ValueError(
@@ -120,19 +131,21 @@ def build_model(parameters, no_of_classes, input_length, gpus=1, optim='rmsprop'
     if gpus != 1:
         model = keras.utils.multi_gpu_model(model, gpus=gpus)
 
-    if optim is not None and loss is not None:
+    if optimizer is not None and loss is not None:
         # compiling model
-        model.compile(optimizer=optim, loss=loss, metrics=['acc'])
-        # model.build(input_shape=input_shape)
+        model.compile(optimizer=optimizer, loss=loss, metrics=['acc'])
+        model.build(input_shape=input_shape)
         # model.summary()
 
     return model
 
 
-def build_autoencoder(parameters: dict, input_shape: tuple):
+def build_autoencoder(parameters: dict, input_shape: tuple, gpus=1, optimizer='adadelta', loss='mse'):
     """
     :param parameters: dictionary containing params {layers, filter, kernel, pool}
     :param input_shape:
+    :param loss:
+    :param optimizer:
     :return: encoder, decoder, autoencoder
     """
     input_data = Input(shape=input_shape)
@@ -145,7 +158,7 @@ def build_autoencoder(parameters: dict, input_shape: tuple):
     for i in range(parameters['layers']):
         x = Conv1D(parameters['filter'] // (2 ** i), parameters['kernel'], activation='relu', padding='same')(x)
         x = MaxPool1D(parameters['pool'], padding='same')(x)
-    encoded = MaxPool1D(parameters['pool'], padding='same')(x)
+    encoded = x
     encoder = keras.models.Model(input_data, encoded)
     encoder.name = 'encoder'
 
@@ -168,12 +181,17 @@ def build_autoencoder(parameters: dict, input_shape: tuple):
 
     autoencoder = keras.models.Model(input_, decoded_)
     autoencoder.name = 'autoencoder'
-    autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
 
-    print('Autoencoder structure: input:{} -> encoded:{} -> decoded:{}'.format(
-        input_.shape, encoded_.shape, decoded_.shape))
+    # transform the model to a parallel one if multiple gpus are available.
+    if gpus != 1:
+        autoencoder = keras.utils.multi_gpu_model(autoencoder, gpus=gpus)
 
-    # autoencoder.summary()
+    autoencoder.compile(optimizer=optimizer, loss=loss)
+
+    print('Autoencoder structure: input:{} -> encoded:{} -> decoded:{}. '
+          'Dimensionality reduction: {:.2f}% (lower is better)'.format(
+        input_.shape, encoded_.shape, decoded_.shape, np.prod(encoded_.shape[1:]) / np.prod(input_.shape[1:]) * 100))
+
     return encoder, decoder, autoencoder
 
 

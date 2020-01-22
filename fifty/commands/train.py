@@ -74,7 +74,7 @@ class Train:
             raise fnfe
 
         # setting up hparam scores dataframe
-        types_dict = {'dense': int, 'embed_size': int, 'use_encoder': int, 'filter': int, 'kernel': int, 'layers': int,
+        types_dict = {'dense': int, 'embed_size': int, 'encoder': str, 'filter': int, 'kernel': int, 'layers': int,
                       'pool': int, 'accuracy': float, 'loss': float, }
 
         self.df = None
@@ -271,6 +271,10 @@ class Train:
         x_train, one_hot_y_train, x_val, one_hot_y_val = self.dataset
         no_of_classes = one_hot_y_train.shape[1]
 
+        if ('embed_size' in parameters and parameters['embed_size']) and \
+                ('encoder' in parameters and parameters['encoder']):
+            del parameters['encoder']
+
         print(f"\ntrain_network(parameters={parameters}, epochs={epochs}, load={load}), no_of_classes={no_of_classes}")
 
         # == formatting data ==
@@ -305,18 +309,24 @@ class Train:
             else:  # default: build new model
 
                 if self.is_train_autoencoder:
-                    encoder, decoder, autoencoder = build_autoencoder(parameters, input_shape=(self.block_size,))
+                    optimizer = keras.optimizers.adadelta(learning_rate=1.0, rho=0.95)
+                    loss_func = keras.losses.mse
 
+                    encoder, decoder, autoencoder = build_autoencoder(parameters, input_shape=(self.block_size,),
+                                                                      gpus=self.gpus, optimizer=optimizer,
+                                                                      loss=loss_func)
                     model = autoencoder
-                    y_train_ = x_train_
-                    y_val_ = x_val_
                 else:
                     # manually defining optimizer and loss
-                    optim = keras.optimizers.rmsprop(lr=0.0005, rho=0.9)
+                    optimizer = keras.optimizers.rmsprop(lr=0.0005, rho=0.9)
                     loss_func = keras.losses.categorical_crossentropy
 
                     model = build_model(parameters, no_of_classes=no_of_classes, input_length=self.block_size,
-                                        gpus=self.gpus, optim=optim, loss=loss_func)
+                                        gpus=self.gpus, optimizer=optimizer, loss=loss_func)
+
+            if self.is_train_autoencoder:
+                y_train_ = x_train_
+                y_val_ = x_val_
 
             print(f"Model path: \"{self.model_dir('.h5', params=parameters)}\"")
 
@@ -336,6 +346,7 @@ class Train:
                 callbacks_list.append(callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, embeddings_freq=0))
 
             os.makedirs(model_dir, exist_ok=True)
+            model.summary()
             history = model.fit(
                 x=x_train_,
                 y=y_train_,
@@ -345,13 +356,13 @@ class Train:
                 verbose=self.verbose,
                 callbacks=callbacks_list,
             )
-            model.summary()
             try:
                 keras.utils.plot_model(model, self.model_dir('.png'), show_shapes=True)
             except Exception as e:
                 print(f"Couln't plot diagram: {e}")
 
-            parameters['loss'] = min(history.history['val_loss'])
+            if 'val_loss' in history.history:
+                parameters['loss'] = max(history.history['val_loss'])
             if 'val_acc' in history.history:
                 parameters['accuracy'] = max(history.history['val_acc'])
 
@@ -363,7 +374,8 @@ class Train:
 
             # raise exception if not whitelisted
             whitelisted_exceptions = ['Negative dimension size caused by subtracting',
-                                      'Error when checking target: expected ']
+                                      'Error when checking target: expected ',
+                                      '']
             if not list(filter(str(ve).__contains__, whitelisted_exceptions)):
                 raise ve
 
@@ -444,6 +456,11 @@ class Train:
         # removing blacklisted attributes
         if params is not None:
             params = {k: v for k, v in params.items() if k not in ['loss', 'accuracy']}
+            if 'encoder' in params:
+                params['encoder'] = os.path.split(params['encoder'])[-1]
+            for k, v in params.items():
+                if type(v) is float:
+                    params[k] = int(v)
 
         # append_params
         if params is not None:
