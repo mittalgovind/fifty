@@ -16,6 +16,7 @@ from keras.utils.np_utils import to_categorical
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
 from utilities.framework import build_model, build_autoencoder
 from utilities.utils import json_paramspace2hyperopt_paramspace, dict_to_safe_filename
+from matplotlib import pyplot as plt
 
 
 # tf.logging.set_verbosity(tf.logging.ERROR)
@@ -72,7 +73,6 @@ class Train:
                   f'Please specify a valid file for hyperparameter exploration using the "--paramspace" option', fnfe)
             raise fnfe
 
-
         # setting up hparam scores dataframe
         types_dict = {'dense': int, 'embed_size': int, 'use_encoder': int, 'filter': int, 'kernel': int, 'layers': int,
                       'pool': int, 'accuracy': float, 'loss': float, }
@@ -90,7 +90,8 @@ class Train:
         # if not loaded, create an empty one
         if self.df is None:
             # limit the attributes to only those in the paramspace json
-            types_dict = {k: v for k, v in types_dict.items() if k in (['accuracy', 'loss'] + list(self.paramspace.keys()))}
+            types_dict = {k: v for k, v in types_dict.items() if
+                          k in (['accuracy', 'loss'] + list(self.paramspace.keys()))}
             self.df = pd.DataFrame(columns=list(types_dict.keys())).astype(types_dict)
 
         # checking --force option
@@ -103,29 +104,74 @@ class Train:
         self.output = make_output_folder(self.input, self.output, self.force)
         self.train_model()
 
-        if self.is_train_autoencoder:
-            print("--autoencoder is true, so there will be no predicting on the WhatIs tool.")
-            return
-
         if self.input is None:
             raise Exception('No input file given for inference on trained model.')
 
         model = self.get_model()
-        from fifty.commands.whatis import WhatIs
-        classifier = WhatIs(self.options, *self.args)
-        gen_files = read_files(self.input, self.block_size, self.recursive)
-        try:
-            while True:
-                file, file_name = next(gen_files)
-                pred_probability = classifier.infer(model, file)
-                classifier.output_predictions(pred_probability, file_name)
-                del file, file_name
-        except Exception as e:
-            print("!Error encountered while predicting: " + str(e))
-            import traceback
-            traceback.print_exc()
 
-    def get_model(self):
+        print('evaluating model...')
+        gen_files = read_files(self.input, self.block_size, self.recursive)
+
+        if self.is_train_autoencoder:
+            try:
+                start_time = time.time()
+                for i, (blocks, file_name) in enumerate(gen_files):
+
+                    print('loaded files in\t{:.2f}s.\t'.format(time.time() - start_time), end='')
+                    time_ = time.time()
+
+                    output = model.predict(blocks)
+
+                    print('predicted in\t{:.2f}s.\t'.format(time.time() - time_), end='')
+                    time_ = time.time()
+
+                    # flattening
+                    plt.plot(blocks.flatten(), label='input', alpha=0.7, linewidth=0.5)
+                    plt.plot(output.flatten(), label='output', alpha=0.7, linewidth=0.5)
+                    plt.title(f'Autoencoder reconstruction {i}')
+                    plt.xlabel(f'Byte index')
+                    plt.ylabel(f'Byte value')
+
+                    plt.legend(loc='upper right')
+
+                    plt.savefig(os.path.join(self.model_dir(), f'reconstruction_{i}_{time.time()}.png'))
+                    plt.show()
+
+                    print('plotted in\t{:.2f}s, total time:\t{:.2f}s'.format(
+                        time.time() - time_, time.time() - start_time))
+
+                    del blocks, file_name
+                    start_time = time.time()
+
+            except Exception as e:
+                print("!Error encountered while predicting: " + str(e))
+                import traceback
+                traceback.print_exc()
+        else:
+            from fifty.commands.whatis import WhatIs
+            classifier = WhatIs(self.options, *self.args)
+            try:
+                start_time = time.time()
+                for blocks, file_name in gen_files:
+                    print('loaded files in\t{:.2f}s.\t'.format(time.time() - start_time), end='')
+                    time_ = time.time()
+
+                    pred_probability = classifier.infer(model, blocks)
+                    print('predicted in\t{:.2f}s.\t'.format(time.time() - time_), end='')
+                    time_ = time.time()
+
+                    classifier.output_predictions(pred_probability, file_name)
+                    print('plotted in\t{:.2f}s, total time:\t{:.2f}s'.format(
+                        time.time() - time_, time.time() - start_time))
+
+                    del blocks, file_name
+                    start_time = time.time()
+            except Exception as e:
+                print("!Error encountered while predicting: " + str(e))
+                import traceback
+                traceback.print_exc()
+
+    def get_model(self) -> keras.Model:
         """Finds and returns a relevant pre-trained model"""
         model = None
         if self.model_name is not None:
@@ -138,9 +184,9 @@ class Train:
             except RuntimeError as re:
                 raise RuntimeError('Could not load the specified model! "{}"'.format(self.model_name), re)
 
-            if self.verbose >= 2:
-                print('Loaded model: "{}". \nSummary of model:'.format(self.model_name))
-                model.summary()
+            print('Loaded model: "{}".'.format(self.model_dir('.h5')))
+            # if self.verbose >= 2:
+            #     model.summary()
         return model
 
     def make_new_dataset(self):
@@ -187,8 +233,7 @@ class Train:
             else:
                 model_name = '512_{}'.format(self.scenario)
             data_dir = os.path.join(self.data_dir, model_name)
-        else:
-            self.model_name = 'new_model'
+
         train_data = np.load(os.path.join(data_dir, 'train.npz'))
         x_train, y_train = train_data['x'], train_data['y']
         one_hot_y_train = to_categorical(y_train)
@@ -343,13 +388,14 @@ class Train:
             # if empty dataframe, perform hparam search, else hparams space already explored
             self.explore_hparam_space(self.paramspace)
         elif len(self.df) > 0:
+            print('\n-------------------------------------\n')
             print('Hparam space already explored, using existing "parameters.csv" file')
         else:
             raise Exception()
 
         self.best_hparams = self.get_best()
         print('Best hyperparams:', self.best_hparams,
-              '\nRetraining the best again on the full dataset.')
+              '\nRetraining best network on the full dataset...')
         self.percent = 1.0
         self.train_network(self.best_hparams, epochs=self.epochs, load=True)
         print('The best model has been retrained and saved as "{}.h5"'.format(self.model_name))
