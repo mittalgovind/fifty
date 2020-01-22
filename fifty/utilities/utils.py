@@ -14,7 +14,7 @@ def make_safe_filename(s: str, replacement='') -> str:
     return s
 
 
-def dict_to_safe_filename(d: dict, sep=',') -> str:
+def dict_to_safe_filename(d: dict, sep=',', replacement='') -> str:
     """
     :returns filename-safe string extracted from the dictionary (assuming that dict is json serializable)
     ```
@@ -24,7 +24,7 @@ def dict_to_safe_filename(d: dict, sep=',') -> str:
     """
     fname = json.dumps(d, sort_keys=True)
     fname = fname.replace(':', '=')
-    fname = re.sub('[\\s"]', '', fname)
+    fname = re.sub('[\\s"]', replacement, fname)
     fname = re.sub(',', sep, fname)
     fname = f'({make_safe_filename(fname)[1:-1]})' # replace {...} with (...)
     return fname

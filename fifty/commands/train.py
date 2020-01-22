@@ -86,8 +86,7 @@ class Train:
                 print(f'Found existing parameters in "{params_path}" with {len(self.df)} entries')
             except Exception as e:
                 print("Couldn't read previous parameters: {0}".format(str(e)))
-
-        # if not loaded, create an empty one
+        # if couln't load, create an empty one
         if self.df is None:
             # limit the attributes to only those in the paramspace json
             types_dict = {k: v for k, v in types_dict.items() if
@@ -96,16 +95,17 @@ class Train:
 
         # checking --force option
         if not len(self.df) and not self.force:
-            raise FileNotFoundError(f"The dataset wasn't loaded, doesn't already exist or is empty: \"{self.output}\". "
-                                    "Ensure a valid dataset exists, "
-                                    "or force creation of a new dataset by specify the \"--force\" or \"-f\" option.")
+            raise FileNotFoundError(
+                f"The output run params weren't loaded/don't already exist/are empty: \"{self.output}\". "
+                "Ensure a valid output exists, "
+                "or force creation of a new output by specify the [-f|--force] option.")
 
     def run(self):
         self.output = make_output_folder(self.input, self.output, self.force)
         self.train_model()
 
         if self.input is None:
-            raise Exception('No input file given for inference on trained model.')
+            raise Exception('No input blocks given for inference on trained model.')
 
         model = self.get_model()
 
@@ -116,6 +116,8 @@ class Train:
             try:
                 start_time = time.time()
                 for i, (blocks, file_name) in enumerate(gen_files):
+                    # keep only 1/100 of the elements (for performance)
+                    blocks = blocks[:int(np.ceil(len(blocks) * 0.01))]
 
                     print('loaded files in\t{:.2f}s.\t'.format(time.time() - start_time), end='')
                     time_ = time.time()
@@ -302,12 +304,9 @@ class Train:
 
                 model = models.load_model(self.model_dir('.h5', params=parameters))
 
-                print('old model loaded in {:.3f}s.'.format(time.time() - start_time), end=' ')
-                start_time = time.time()
-
-                print('model successfully loaded in {:.3f}s'.format(time.time() - start_time))
-            else:  # default: build new model
-
+                print('old model loaded in {:.2f}s.'.format(time.time() - start_time))
+            else:
+                # default: build new model
                 if self.is_train_autoencoder:
                     optimizer = keras.optimizers.adadelta(learning_rate=1.0, rho=0.95)
                     loss_func = keras.losses.mse
