@@ -13,7 +13,7 @@ import keras
 from keras import callbacks, backend, models
 from keras.utils.np_utils import to_categorical
 
-from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags
+from utilities.framework import read_files, make_output_folder, load_labels_tags
 from utilities.framework import build_model, build_autoencoder
 from utilities.utils import json_paramspace2hyperopt_paramspace, dict_to_safe_filename
 from matplotlib import pyplot as plt
