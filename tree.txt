@@ -1,0 +1,70 @@
+Folder PATH listing for volume Windows 10
+Volume serial number is 46B8-16DB
+C:.
+│   .gitignore
+│   AUTHORS
+│   fifty_logo.png
+│   LICENSE
+│   MANIFEST.in
+│   README.md
+│   requirements.txt
+│   scale_down.txt
+│   setup.cfg
+│   setup.py
+│   tree.txt
+│   
+└───fifty
+    │   cli.py
+    │   hparamspace.json
+    │   hparamspace_autoencoder.json
+    │   run_tensorboard.sh
+    │   __init__.py
+    │   __init__.pyc
+    │   
+    ├───commands
+    │      train.py
+    │      whatis.py
+    │      __init__.py
+    │      
+    │           
+    ├───data
+    │   │   classes.json
+    │   │   tags.txt
+    │   │   
+    │   └───512_6
+    │           test.npz
+    │           train.npz
+    │           val.npz
+    │           
+    ├───output
+    │   ├───new_model(dense=16,embed_size=32,filter=64,kernel=11,layers=3,pool=4)
+    │   └───new_model(dense=256,embed_size=64,filter=16,kernel=19,layers=2,pool=8)
+    ├───output_autoencoder
+    │   ├───autoencoder(filter=250,kernel=3,layers=2,pool=8)
+    │   │   └───fit
+    │   ├───autoencoder(filter=250,kernel=3,layers=3,pool=8)
+    │   │   └───fit
+    │   └───autoencoder(filter=250,kernel=35,layers=3,pool=4)
+    │       └───fit
+    └───utilities
+        │   framework.py
+        │   labels.json
+        │   utils.py
+        │   __init__.py
+        │   
+        └───models
+               4096_1.h5
+               4096_1_lighter.h5
+               4096_2.h5
+               4096_3.h5
+               4096_4.h5
+               4096_5.h5
+               4096_6.h5
+               512_1.h5
+               512_2.h5
+               512_3.h5
+               512_4.h5
+               512_5.h5
+               512_6.h5
+               __init__.py
+               
