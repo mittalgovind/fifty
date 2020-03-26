@@ -179,7 +179,7 @@ class WhatIs:
 
         if not self.block_wise:
             labels = df['Class Label'].value_counts()
-            normalized_labels *= 100 / labels.sum()
+            normalized_labels = labels * 100 / labels.sum()
             top_labels = normalized_labels[:4]
             output = '{}: {{'.format(file_name)
             for label, percent in top_labels.items():
