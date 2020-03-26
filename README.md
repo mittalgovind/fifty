@@ -113,3 +113,22 @@ For preparing a dataset that is compatible with FiFTy, please follow these steps
 2.  Sample 102400 blocks from these files and create an ndarray (say, blocks) of shape: (102400, block-size) and labels (say, classes) of shape - (102400) of class_number you choose.
 3.  Concatenate all the blocks (as x) and classes (as y) of all file-types and shuffle using `random.shuffle`. 
 4.  Save the np.savez_compressed('new_dataset.npz', x=x, y=y).
+
+## Running from source
+
+The following command assumes that the folder structure is as follows:
+    
+    fifty/
+    ├── data/
+    │   ├── 512_6/
+    ├── output/
+    ├── utilities/
+    │── cli.py
+
+And assumes scenario 6, and that the dataset is in a folder is `./data/512_6/`     
+
+```sh
+python cli.py train --output ./output -d ./data/512_6 --percent 0.00001 --block-size 512
+```
+
+`--percent 0.00001` is used to speed up testing. 

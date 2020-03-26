@@ -4,6 +4,8 @@
 import os
 import re
 import json
+import sys
+
 import pandas as pd
 import numpy as np
 import time
@@ -14,7 +16,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pylab as plt
 from matplotlib import rcParams, cycler
 import matplotlib as mpl
-tf.logging.set_verbosity(tf.logging.ERROR)
+# tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.models import load_model
 from fifty.utilities.framework import read_files, make_output_folder, load_labels_tags, get_utilities_dir
 
@@ -23,8 +25,12 @@ from pdb import set_trace
 
 class WhatIs:
     def __init__(self, options, *args):
-        self.input = os.path.abspath(options['<input>'])
-        self.file_name = options['<input>']
+        options['<input>'] = '.' if (options['<input>'] is None) \
+            else os.path.abspath(options['<input>'])
+        options['--model-name'] = None if (options['--model-name'] is None) \
+            else os.path.abspath(options['--model-name'])
+
+        self.input = options['<input>']
         self.recursive = options['--recursive']
         self.block_size = int(options['--block-size'])
         self.block_wise = options['--block-wise']
@@ -34,16 +40,13 @@ class WhatIs:
         self.light = options['--light']
         self.verbose = int(options['-v'])
         self.labels, self.tags = load_labels_tags(self.scenario)
-        if options['--model-name'] is not None:
-            self.model_name = os.path.abspath(options['--model-name'])
-        else:
-            self.model_name = None
+        self.model_name = options['--model-name']
         self.args = args
+        self.options = options
 
     def run(self):
         if self.input is None:
-            parser.print_usage()
-            sys.exit(1)
+            raise Exception("Input not provided, please see usage")
 
         if self.verbose >= 1:
             self.output = make_output_folder(self.input, self.output, self.force)
@@ -58,8 +61,8 @@ class WhatIs:
                 pred_probability = self.infer(model, file)
                 self.output_predictions(pred_probability, file_name)
                 del file, file_name
-        except:
-            pass
+        except Exception as e:
+            print(e)
         if self.verbose >= 2:
             print('Prediction Complete!')
         return
@@ -165,7 +168,7 @@ class WhatIs:
         """Saves prediction in relevant format to disk"""
         pred_class = np.argmax(pred_probability, axis=1)
         pred_label = [self.labels[i] for i in pred_class]
-        pred_probability = np.round(np.max(pred_probability, axis=1) * 100, decimals=1)
+        pred_probability = np.round(np.max(pred_probability, axis=1) * 100.0, decimals=1)
         tags = [self.tags[i] for i in pred_class]
         df = pd.DataFrame(
             {

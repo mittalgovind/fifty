@@ -1,0 +1,9 @@
+{
+    "layers": [1, 2, 3],
+    "embed_size": [16, 32, 48, 64],
+    "encoder": ["", "./output_autoencoder/autoencoder.h5"],
+    "filter": [16, 32, 64, 128],
+    "kernel": [3, 11, 19, 27, 35],
+    "pool": [2, 4, 6, 8],
+    "dense": [16, 32, 64, 128, 256]
+}
