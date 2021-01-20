@@ -1,6 +1,6 @@
 pandas
 numpy==1.16.0
-tensorflow==1.5.0
+tensorflow==2.4.0
 keras==2.1.6
 pathlib
 hyperopt
